@@ -1,65 +1,89 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>Willow — Notecard</title>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Willow — Notecard • Library • Graph</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64'%3E%3Ctext y='50' font-size='48'%3E%F0%9F%8C%B2%3C/text%3E%3C/svg%3E">
+<!-- Cytoscape for graph -->
+<script src="https://unpkg.com/cytoscape@3.30.3/dist/cytoscape.min.js"></script>
 <style>
   :root{
-    --ink:#222; --muted:#666; --line:#ddd; --bg:#fafafa; --chip:#f1f1f1;
-    --accent:#111; --btn:#f8f8f8;
+    --ink:#222; --muted:#6b7280; --line:#e5e7eb; --bg:#f8fafc; --chip:#f3f4f6;
+    --panel:#ffffff; --btn:#f9fafb; --accent:#111827;
   }
   *{box-sizing:border-box}
-  body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.4 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,"Noto Sans",sans-serif}
-  header{padding:12px 20px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center}
-  h1{margin:0;font-size:18px}
-  .wrap{padding:16px;max-width:1200px;margin:0 auto}
-  .grid{display:grid;grid-template-columns:260px 1fr 280px;gap:16px;min-height:70vh}
-  .pane{background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px}
-  .tabs{display:flex;gap:6px;margin-bottom:8px}
-  .tab{border:1px solid var(--line);background:#fff;border-radius:8px;padding:6px 10px;font-size:12px;cursor:pointer}
+  html,body{height:100%}
+  body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,"Noto Sans",sans-serif}
+  header{padding:12px 20px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;background:#fff;position:sticky;top:0;z-index:5}
+  .title{display:flex;gap:10px;align-items:baseline}
+  .title h1{margin:0;font-size:18px}
+  .nav{display:flex;gap:8px;align-items:center}
+  .nav a{padding:6px 10px;border:1px solid var(--line);border-radius:10px;background:#fff;text-decoration:none;color:inherit}
+  .nav a.active{background:#111;color:#fff;border-color:#111}
+  .wrap{max-width:1200px;margin:0 auto;padding:16px}
+  .grid-3{display:grid;grid-template-columns:260px 1fr 300px;gap:16px}
+  .pane{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px}
+  .tabs{display:flex;gap:8px}
+  .tab{padding:6px 10px;border:1px solid var(--line);border-radius:10px;background:#fff;cursor:pointer}
   .tab.active{background:#efefef}
-  .list{border-top:1px solid var(--line);margin-top:8px;max-height:70vh;overflow:auto}
-  .item{padding:10px;border-bottom:1px dashed #e5e5e5;cursor:pointer}
+  .list{border-top:1px solid var(--line);margin-top:10px;max-height:70vh;overflow:auto}
+  .item{padding:10px;border-bottom:1px dashed #e5e7eb;cursor:pointer}
   .item .t{font-weight:600}
   .item .d{color:var(--muted);font-size:12px}
-  .field{margin-bottom:10px}
-  input[type="text"], textarea{width:100%;border:1px solid var(--line);border-radius:10px;padding:10px;font:inherit;background:#fff}
-  textarea{min-height:340px;resize:vertical}
-  .editor-head{display:flex;gap:8px;align-items:center}
-  .row{display:flex;justify-content:space-between;align-items:center;gap:10px}
+  .muted{color:var(--muted)}
+  .row{display:flex;gap:10px;align-items:center}
+  .row.space{justify-content:space-between}
   .btn{background:var(--btn);border:1px solid var(--line);border-radius:10px;padding:8px 12px;cursor:pointer}
   .btn.primary{background:#111;color:#fff;border-color:#111}
-  .chips{display:flex;flex-wrap:wrap;gap:6px}
+  input[type="text"],textarea,select{width:100%;border:1px solid var(--line);border-radius:10px;padding:10px;background:#fff;font:inherit}
+  textarea{min-height:340px;resize:vertical}
+  .chips{display:flex;gap:6px;flex-wrap:wrap}
   .chip{background:var(--chip);border:1px solid var(--line);border-radius:999px;padding:4px 8px;font-size:12px}
   .side-title{font-weight:700;margin:4px 0 8px}
-  .sugg{border-top:1px solid var(--line);padding-top:8px;max-height:60vh;overflow:auto}
-  .sugg-item{padding:6px;border:1px dashed #ddd;border-radius:8px;margin-bottom:8px;cursor:pointer}
+  .sugg{border-top:1px solid var(--line);padding-top:8px;max-height:50vh;overflow:auto}
+  .sugg-item{padding:8px;border:1px dashed #d1d5db;border-radius:10px;margin-bottom:8px;cursor:pointer}
   .sugg-item:hover{background:#fafafa}
-  .debate{display:flex;flex-direction:column;gap:6px}
-  .badges{display:flex;gap:6px}
   .mono{font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;font-size:12px;color:#555}
-  .muted{color:var(--muted)}
-  .footer{margin-top:8px;color:#888;font-size:12px;text-align:center}
+  .footer{text-align:center;color:#9ca3af;font-size:12px;margin-top:12px}
+  /* Library */
+  .lib{display:grid;grid-template-columns:240px 1fr;gap:16px}
+  .lib-grid{display:grid;gap:12px}
+  .card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px;cursor:pointer;display:flex;flex-direction:column}
+  .card .title{font-weight:700;font-size:13px;margin-bottom:6px}
+  .card .preview{color:var(--muted);font-size:12px;flex:1}
+  .card .meta{display:flex;gap:8px;color:#6b7280;font-size:11px;margin-top:6px}
+  .sliderrow{display:flex;gap:10px;align-items:center;justify-content:flex-end}
+  .badge{border:1px solid var(--line);padding:2px 6px;border-radius:999px;font-size:11px;background:#f9fafb}
+  /* Graph */
+  #cy{height:540px;border:1px solid var(--line);border-radius:12px;background:#fff}
+  .controls{display:flex;gap:20px;align-items:center;margin-bottom:10px}
+  .control{display:flex;gap:8px;align-items:center}
+  .divider{height:1px;background:var(--line);margin:10px 0}
+  /* Cluster */
+  .cluster{display:grid;grid-template-columns:200px 1fr;gap:16px}
+  .cluster-canvas{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-start}
+  .note-card{border:1px solid var(--line);border-radius:12px;background:#fff;padding:10px}
 </style>
 </head>
 <body>
 <header>
-  <h1>Willow — Notecard</h1>
-  <div class="badges">
-    <button id="btn-export" class="btn">Export</button>
-    <label class="btn" style="cursor:pointer">
-      <input id="file-import" type="file" accept="application/json" style="display:none"> Import
-    </label>
-    <button id="btn-gensuggest" class="btn">Generate Suggestions</button>
+  <div class="title">
+    <h1>Willow</h1>
+    <span class="muted">Notecard • Library • Graph</span>
   </div>
+  <nav class="nav">
+    <a href="#/notecard" id="nav-notecard" class="active">Notecard</a>
+    <a href="#/library" id="nav-library">Library</a>
+    <a href="#/graph" id="nav-graph">Graph</a>
+  </nav>
 </header>
 
-<div class="wrap">
-  <div class="grid">
-    <!-- LEFT: Notes/Suggestions list -->
-    <aside class="pane" id="left-pane">
+<main class="wrap">
+  <!-- ===== Notecard ===== -->
+  <section id="view-notecard" class="grid-3">
+    <!-- Left column -->
+    <aside class="pane">
       <div class="tabs">
         <button id="tab-notes" class="tab active">Notes</button>
         <button id="tab-suggestions" class="tab">Suggestions</button>
@@ -67,233 +91,614 @@
       <div id="left-list" class="list"></div>
     </aside>
 
-    <!-- CENTER: Editor -->
-    <section class="pane" id="center-pane">
-      <div class="field editor-head">
-        <input id="title" type="text" placeholder="Title (new note)">
-      </div>
+    <!-- Middle editor -->
+    <section class="pane">
+      <div class="field"><input id="nc-title" type="text" placeholder="Title (new note)"/></div>
       <div class="field">
-        <textarea id="content" placeholder="Text (new note)
+        <textarea id="nc-content" placeholder="Text (new note)
+
 The lazy brown fox jumps over the hedge.
 
 [[drafted links]]
 [[suggested links added if clicked]]"></textarea>
       </div>
-      <div class="row">
-        <div class="badges">
+      <div class="row space">
+        <div class="row">
           <button id="btn-save" class="btn">Save</button>
+          <button id="btn-new" class="btn">New</button>
         </div>
-        <div class="badges">
-          <label class="btn">
-            <input id="file-attach" type="file" style="display:none">
-            FILE
-          </label>
-        </div>
+        <label class="btn">
+          <input id="file-attach" type="file" style="display:none"> FILE
+        </label>
       </div>
       <div class="field" style="margin-top:10px">
-        <input id="tags" type="text" placeholder="#Tags   #drafted tags; suggested">
+        <input id="nc-tags" type="text" placeholder="#Tags   #drafted tags; suggested"/>
         <div id="tag-chips" class="chips" style="margin-top:6px"></div>
       </div>
       <div id="debate-thread" class="mono"></div>
     </section>
 
-    <!-- RIGHT: Suggested Links + Debate -->
-    <aside class="pane" id="right-pane">
-      <div class="side-title">Suggested Links</div>
+    <!-- Right column -->
+    <aside class="pane">
+      <div class="row space">
+        <div class="side-title">Suggested Links</div>
+        <button class="btn" id="btn-run-suggest">Suggested Links</button>
+      </div>
       <div id="suggested" class="sugg"></div>
-      <div style="height:10px"></div>
-      <div class="row"><div class="side-title">Debate</div><button id="debate-toggle" class="btn" title="collapse/expand">▾</button></div>
-      <div id="debate" class="debate">
-        <select id="debate-agent">
-          <option>Historian</option>
-          <option>Blind Spot</option>
-          <option>Interconnectedness</option>
-          <option>Economist</option>
+
+      <div class="divider"></div>
+      <div class="row space">
+        <div class="side-title">Debate</div>
+        <select id="debate-agent" style="width:auto">
+          <option value="Historian">Historian</option>
+          <option value="Economist">Economist</option>
+          <option value="Contrarian">Contrarian</option>
+          <option value="Blind Spot">Blind Spot</option>
+          <option value="Interconnectedness">Interconnectedness</option>
         </select>
-        <textarea id="debate-text" rows="6" placeholder="Historian —
+      </div>
+      <textarea id="debate-text" rows="7" placeholder="Historian —
 This reminds me of ...
 ..."></textarea>
-        <button id="debate-add" class="btn">Add</button>
+      <button id="debate-add" class="btn" style="margin-top:6px">Add</button>
+    </aside>
+  </section>
+
+  <!-- ===== Library ===== -->
+  <section id="view-library" class="lib" style="display:none">
+    <aside class="pane">
+      <h3 style="margin:0 0 8px 0">LIBRARY</h3>
+      <div class="muted" style="margin-bottom:6px">Full catalogue</div>
+      <div style="margin-bottom:10px">
+        <div class="muted" style="margin:8px 0 4px">Projects</div>
+        <div id="lib-projects" class="mono" style="font-size:12px"></div>
+      </div>
+      <div class="divider"></div>
+      <div style="display:grid;gap:8px">
+        <div class="muted" style="margin-top:4px">Filter by</div>
+        <input id="lib-search" type="text" placeholder="Search titles/content"/>
+        <input id="lib-tag-filter" type="text" placeholder="#tag1, #tag2"/>
+        <label class="row"><span class="muted" style="width:100px">Min linkages</span>
+          <input id="lib-min-links" type="range" min="0" max="10" step="1" value="0" style="flex:1">
+          <span id="lib-min-links-val" class="badge">0</span>
+        </label>
+        <label class="row"><span class="muted" style="width:100px">Newest first</span>
+          <input id="lib-sort" type="checkbox" checked>
+        </label>
       </div>
     </aside>
-  </div>
-  <div class="footer">Local-first. Your data stays in this browser (localStorage). Built for Willow PRD sketch layout.</div>
-</div>
+
+    <section>
+      <div class="row space" style="margin-bottom:8px">
+        <div class="muted">Adjust card size</div>
+        <div class="sliderrow">
+          <input id="lib-size" type="range" min="160" max="320" step="10" value="220">
+        </div>
+      </div>
+      <div id="lib-grid" class="lib-grid"></div>
+    </section>
+  </section>
+
+  <!-- ===== Graph ===== -->
+  <section id="view-graph" style="display:none">
+    <div class="pane">
+      <h3 style="margin:0 0 8px 0">GRAPH</h3>
+      <div class="controls">
+        <div class="control">
+          <span class="muted">Breadth (min degree)</span>
+          <input id="gr-breadth" type="range" min="0" max="10" step="1" value="0">
+          <span id="gr-breadth-val" class="badge">0</span>
+        </div>
+        <div class="control">
+          <span class="muted">Depth (hops from focus)</span>
+          <input id="gr-depth" type="range" min="1" max="6" step="1" value="6">
+          <span id="gr-depth-val" class="badge">6</span>
+        </div>
+        <div class="control">
+          <button class="btn" id="gr-reset-focus">Clear focus</button>
+        </div>
+      </div>
+      <div id="cy"></div>
+      <div class="muted" style="margin-top:8px">Tip: click a node to switch to the Card Cluster view.</div>
+    </div>
+
+    <div class="pane" id="cluster-pane" style="margin-top:16px">
+      <div class="row space">
+        <h3 style="margin:0">GRAPH: Card Cluster</h3>
+        <div class="row">
+          <span class="muted">Card size</span>
+          <input id="cl-size" type="range" min="160" max="320" step="10" value="220">
+          <span class="muted" style="margin-left:8px">Depth</span>
+          <input id="cl-depth" type="range" min="1" max="5" step="1" value="1">
+        </div>
+      </div>
+      <div class="cluster">
+        <aside>
+          <div class="muted">Focus Note</div>
+          <div id="cl-focus" class="note-card"></div>
+          <div class="divider"></div>
+          <div class="muted">Linked notes</div>
+          <div id="cl-links" class="mono" style="font-size:12px"></div>
+        </aside>
+        <section id="cl-canvas" class="cluster-canvas"></section>
+      </div>
+    </div>
+  </section>
+
+  <div class="footer">Local-first. All data is stored in your browser (localStorage). © 2025</div>
+</main>
 
 <script>
-// ------- State -------
-const state = {
-  notes: JSON.parse(localStorage.getItem('w2_notes')||'[]'), // {id,title,content,tags[],file?}
-  suggestions: JSON.parse(localStorage.getItem('w2_suggestions')||'[]'), // cached last suggestions
-  draftId: null,
+/* ========== Small utilities ========== */
+const $ = sel => document.querySelector(sel);
+const $$ = sel => Array.from(document.querySelectorAll(sel));
+const escapeHTML = s => (''+s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+const uid = () => crypto.randomUUID ? crypto.randomUUID() : (Date.now()+Math.random()).toString(36);
+const nowISO = () => new Date().toISOString();
+const oneSentence = s => {
+  s = (s||'').replace(/\s+/g,' ').trim();
+  const cut = s.indexOf('.'); 
+  return (cut>40? s.slice(0,140)+'…' : (cut>0? s.slice(0,cut+1): s.slice(0,140))) || '(no description)';
 };
-function saveAll(){ localStorage.setItem('w2_notes', JSON.stringify(state.notes)); localStorage.setItem('w2_suggestions', JSON.stringify(state.suggestions)); }
-function uid(){ return crypto.randomUUID ? crypto.randomUUID() : String(Date.now()+Math.random()); }
-function oneSentence(s){ s = (s||'').replace(/\s+/g,' ').trim(); const cut = s.indexOf('.'); return (cut>40? s.slice(0,140)+'…' : (cut>0? s.slice(0,cut+1): s.slice(0,140))) || '(no description)'; }
-function atCursorInsert(textarea, text){
-  const start = textarea.selectionStart, end = textarea.selectionEnd;
-  const before = textarea.value.substring(0,start), after = textarea.value.substring(end);
-  textarea.value = before + text + after;
-  const pos = start + text.length;
-  textarea.selectionStart = textarea.selectionEnd = pos;
-  textarea.focus();
+const tokenizeTags = s => (s||'').split(',').map(x=>x.trim().replace(/^#/,'')).filter(Boolean);
+
+/* ========== Persistent state ========== */
+const state = {
+  notes: JSON.parse(localStorage.getItem('wl_notes')||'[]'),       // {id,title,content,tags[],created_at,updated_at,file?,debate[]}
+  focusId: localStorage.getItem('wl_focusId') || null,             // graph focus
+};
+const save = () => { localStorage.setItem('wl_notes', JSON.stringify(state.notes)); localStorage.setItem('wl_focusId', state.focusId || ''); };
+
+/* ========== Wikilinks extraction & link table ========== */
+function extractLinks(text){
+  const out = [];
+  if(!text) return out;
+  const re = /\[\[([^\]]+)\]\]/g; let m;
+  while ((m = re.exec(text)) !== null) { out.push(m[1].trim()); }
+  return out;
+}
+// Build adjacency using titles (unique). If duplicate titles, later note wins.
+function buildGraph(){
+  const titleToId = {}; state.notes.forEach(n => { if (n.title) titleToId[n.title] = n.id; });
+  const edges = [];
+  state.notes.forEach(n => {
+    const titles = extractLinks(n.content);
+    titles.forEach(t => {
+      const to = titleToId[t];
+      if (to && to !== n.id) edges.push({from:n.id, to});
+    });
+  });
+  return {edges}; // directed edges
+}
+function degreeMap(edges){
+  const deg = {};
+  edges.forEach(e => { deg[e.from]=(deg[e.from]||0)+1; deg[e.to]=(deg[e.to]||0)+1; });
+  return deg;
+}
+function neighborsMap(edges){
+  const map = {};
+  edges.forEach(e => {
+    (map[e.from]=map[e.from]||new Set()).add(e.to);
+    (map[e.to]=map[e.to]||new Set()).add(e.from);
+  });
+  return map;
 }
 
-// ------- Elements -------
-const elLeftList = document.getElementById('left-list');
-const elTabNotes = document.getElementById('tab-notes');
-const elTabSuggestions = document.getElementById('tab-suggestions');
-const elTitle = document.getElementById('title');
-const elContent = document.getElementById('content');
-const elTags = document.getElementById('tags');
-const elTagChips = document.getElementById('tag-chips');
-const elSuggested = document.getElementById('suggested');
-const elDebateThread = document.getElementById('debate-thread');
+/* ========== Router ========== */
+function show(hash){
+  const h = hash || location.hash || '#/notecard';
+  $('#nav-notecard').classList.toggle('active', h==='#/notecard');
+  $('#nav-library').classList.toggle('active', h==='#/library');
+  $('#nav-graph').classList.toggle('active', h==='#/graph');
+  $('#view-notecard').style.display = h==='#/notecard' ? '' : 'none';
+  $('#view-library').style.display = h==='#/library' ? '' : 'none';
+  $('#view-graph').style.display = h==='#/graph' ? '' : 'none';
+  if (h==='#/library') renderLibrary();
+  if (h==='#/graph') { renderGraph(); renderCluster(); }
+}
+window.addEventListener('hashchange', ()=>show());
+show();
 
-// ------- Rendering -------
+/* ========== Notecard UI ========== */
 let leftMode = 'notes';
-function renderLeft(){
-  elLeftList.innerHTML='';
-  if (leftMode==='notes'){
-    if (state.notes.length===0){ elLeftList.innerHTML='<div class="item muted">No notes saved.</div>'; return; }
-    state.notes.slice().sort((a,b)=> new Date(b.updated_at||b.created_at) - new Date(a.updated_at||a.created_at)).forEach((n,i)=>{
+let currentId = null; // editing note id (null for new)
+
+function renderLeftList(){
+  const host = $('#left-list'); host.innerHTML = '';
+  if (leftMode === 'notes'){
+    if(state.notes.length===0){ host.innerHTML = '<div class="item muted">No notes saved.</div>'; return; }
+    const items = state.notes.slice().sort((a,b)=> new Date(b.updated_at||b.created_at) - new Date(a.updated_at||a.created_at));
+    items.forEach(n => {
       const div = document.createElement('div'); div.className='item';
-      div.innerHTML = `<div class="t">${escape(n.title||'(untitled)')}</div>
-                       <div class="d">${escape(oneSentence(n.content))}</div>`;
+      div.innerHTML = `<div class="t">${escapeHTML(n.title||'(untitled)')}</div>
+                       <div class="d">${escapeHTML(oneSentence(n.content))}</div>`;
       div.addEventListener('click', ()=>loadNote(n.id));
-      elLeftList.appendChild(div);
+      host.appendChild(div);
     });
   } else {
-    if (state.suggestions.length===0){ elLeftList.innerHTML='<div class="item muted">No agent suggestions yet. Click "Generate Suggestions".</div>'; return; }
-    state.suggestions.forEach(s => {
+    // suggestions are computed on demand; we mirror in right pane also
+    const suggs = computeSuggestions(currentNoteDraft());
+    if (suggs.length===0){ host.innerHTML = '<div class="item muted">No suggestions. Click “Suggested Links”.</div>'; return; }
+    suggs.forEach(s => {
       const div = document.createElement('div'); div.className='item';
-      div.innerHTML = `<div class="t">${escape(s.title)}</div><div class="d">${escape(s.reason||'Suggestion')}</div>`;
+      div.innerHTML = `<div class="t">${escapeHTML(s.title)}</div><div class="d">${escapeHTML(s.reason)}</div>`;
       div.addEventListener('click', ()=>insertSuggestion(s));
-      elLeftList.appendChild(div);
+      host.appendChild(div);
     });
   }
 }
-function renderSuggestedLinks(){
-  elSuggested.innerHTML = '';
-  state.suggestions.forEach(s => {
-    const a = document.createElement('div');
-    a.className='sugg-item';
-    a.innerHTML = `<div><b>${escape(s.title)}</b></div><div class="muted" style="font-size:12px">${escape(s.reason||oneSentence(s.preview||''))}</div>`;
-    a.title = 'Click to insert [[link]] into editor';
-    a.addEventListener('click', ()=>insertSuggestion(s));
-    elSuggested.appendChild(a);
-  });
-}
-function renderTags(){
-  const tags = (elTags.value||'').split(',').map(t=>t.trim()).filter(Boolean);
-  elTagChips.innerHTML = tags.map(t=>`<span class="chip">#${escape(t)}</span>`).join('');
-}
-function renderAll(){ renderLeft(); renderSuggestedLinks(); renderTags(); }
+$('#tab-notes').addEventListener('click', ()=>{ leftMode='notes'; $('#tab-notes').classList.add('active'); $('#tab-suggestions').classList.remove('active'); renderLeftList(); });
+$('#tab-suggestions').addEventListener('click', ()=>{ leftMode='suggestions'; $('#tab-suggestions').classList.add('active'); $('#tab-notes').classList.remove('active'); renderLeftList(); });
 
-// ------- Actions -------
-function loadNote(id){
-  const n = state.notes.find(x=>x.id===id); if (!n) return;
-  state.draftId = n.id;
-  elTitle.value = n.title || '';
-  elContent.value = n.content || '';
-  elTags.value = (n.tags||[]).join(', ');
-  renderTags();
+function renderTagChips(){
+  const tags = tokenizeTags($('#nc-tags').value);
+  $('#tag-chips').innerHTML = tags.map(t=>`<span class="chip">#${escapeHTML(t)}</span>`).join('');
 }
-function currentNoteFromEditor(){
+$('#nc-tags').addEventListener('input', renderTagChips);
+
+function loadNote(id){
+  const n = state.notes.find(x=>x.id===id); if(!n) return;
+  currentId = id;
+  $('#nc-title').value = n.title || '';
+  $('#nc-content').value = n.content || '';
+  $('#nc-tags').value = (n.tags||[]).join(', ');
+  renderTagChips();
+}
+
+function currentNoteDraft(){
   return {
-    id: state.draftId || uid(),
-    title: elTitle.value.trim(),
-    content: elContent.value,
-    tags: (elTags.value||'').split(',').map(s=>s.trim()).filter(Boolean),
-    file: null,
+    id: currentId || uid(),
+    title: $('#nc-title').value.trim(),
+    content: $('#nc-content').value,
+    tags: tokenizeTags($('#nc-tags').value),
   };
 }
-function insertSuggestion(s){
-  atCursorInsert(elContent, `[[${s.title}]]`);
-}
-function escape(s){ return (''+s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',\"'\":'&#39;'}[m])); }
 
-// Generate suggestions: simple tag-overlap heuristic with existing notes
-function generateSuggestions(){
-  const note = currentNoteFromEditor();
-  const suggestions = [];
-  state.notes.forEach(n => {
-    if (!n.title) return;
-    const overlap = (n.tags||[]).filter(t => (note.tags||[]).includes(t));
-    if (overlap.length>0){
-      suggestions.push({ id:n.id, title:n.title, reason:`Shares ${overlap.length} tag(s): ${overlap.join(', ')}`, preview:n.content.slice(0,160)});
+$('#btn-new').addEventListener('click', ()=>{
+  currentId = null;
+  $('#nc-title').value=''; $('#nc-content').value=''; $('#nc-tags').value='';
+  renderTagChips();
+});
+
+$('#btn-save').addEventListener('click', ()=>{
+  const n = currentNoteDraft();
+  if(!n.title){ alert('Please add a title.'); return; }
+  const i = state.notes.findIndex(x=>x.id===n.id);
+  const stamp = nowISO();
+  if (i>=0){
+    const prev = state.notes[i];
+    state.notes[i] = {...prev, ...n, updated_at: stamp};
+  } else {
+    state.notes.push({...n, created_at: stamp, updated_at: stamp, debate: []});
+  }
+  save(); renderLeftList(); alert('Saved.');
+});
+
+$('#file-attach').addEventListener('change', ev=>{
+  const file = ev.target.files[0]; if(!file) return;
+  const n = currentNoteDraft();
+  const i = state.notes.findIndex(x=>x.id===n.id);
+  if(i>=0){ state.notes[i].file = {name:file.name, size:file.size, type:file.type}; save(); alert('Attached (stored metadata locally).'); }
+  else alert('Save the note first, then attach.');
+});
+
+/* ---- Tag agent (very simple keyword heuristic) ---- */
+function tagAgent(note){
+  const text = (note.title+' '+note.content).toLowerCase();
+  const dict = {
+    banking:['bank','deposit','run','liquidity','loan','balance'],
+    inflation:['inflation','cpi','prices','wages'],
+    growth:['gdp','growth','output','productivity'],
+    cre:['real estate','office','rent','vacancy','cap rate','commercial'],
+    energy:['oil','gas','energy','opec','fuel'],
+    policy:['fomc','rates','policy','fed','central bank','tighten','ease'],
+    risk:['volatility','cds','stress','default','contagion','spillover'],
+  };
+  const picks = [];
+  Object.entries(dict).forEach(([tag, words])=>{
+    if (words.some(w=>text.includes(w))) picks.push(tag);
+  });
+  return picks.slice(0,5);
+}
+
+/* ---- Suggested Links agent ---- */
+function computeSuggestions(note){
+  const {edges} = buildGraph();
+  const deg = degreeMap(edges);
+  // overlap by tags and by simple text similarity (title words)
+  const kw = new Set((note.title||'').toLowerCase().split(/\W+/).filter(x=>x.length>3));
+  const out = [];
+  state.notes.forEach(n=>{
+    if(!n.title || n.id===note.id) return;
+    const tagOverlap = (n.tags||[]).filter(t => (note.tags||[]).includes(t));
+    const wordOverlap = (n.title||'').toLowerCase().split(/\W+/).filter(x=>x.length>3 && kw.has(x));
+    const score = tagOverlap.length*2 + wordOverlap.length + (deg[n.id]||0)*0.1;
+    if (score>0){
+      out.push({id:n.id, title:n.title, reason:`Tags: ${tagOverlap.join(', ')||'—'} • Words: ${wordOverlap.join(', ')||'—'} • Links: ${deg[n.id]||0}`});
     }
   });
-  // also propose 2 generic prompts
-  suggestions.push({ id: 'hist', title: 'Historian: analog to dot-com era', reason:'Debate prompt', preview:'' });
-  suggestions.push({ id: 'blind', title: 'Blind Spot: EM spillovers', reason:'Debate prompt', preview:'' });
-  state.suggestions = suggestions;
-  saveAll(); renderSuggestedLinks(); if (leftMode==='suggestions') renderLeft();
+  out.sort((a,b)=> b.title===note.title ? -1 : 0 || b.reason.length - a.reason.length);
+  return out.slice(0,12);
+}
+function renderSuggestions(){
+  const host = $('#suggested'); host.innerHTML='';
+  const note = currentNoteDraft();
+  const suggs = computeSuggestions(note);
+  if(suggs.length===0){ host.innerHTML = '<div class="muted">No suggestions yet. Try saving a few notes and adding tags.</div>'; return; }
+  suggs.forEach(s=>{
+    const div = document.createElement('div'); div.className='sugg-item';
+    div.innerHTML = `<div><b>${escapeHTML(s.title)}</b></div><div class="muted" style="font-size:12px">${escapeHTML(s.reason)}</div>`;
+    div.addEventListener('click', ()=>insertSuggestion(s));
+    host.appendChild(div);
+  });
+}
+$('#btn-run-suggest').addEventListener('click', ()=>{
+  // prefill tag suggestions in the tag box (grey autofill style)
+  const note = currentNoteDraft();
+  const tags = new Set(note.tags);
+  tagAgent(note).forEach(t=>tags.add(t));
+  $('#nc-tags').value = Array.from(tags).join(', ');
+  renderTagChips();
+  renderSuggestions();
+});
+
+function insertSuggestion(s){
+  const ta = $('#nc-content');
+  const text = `[[${s.title}]]`;
+  const start = ta.selectionStart, end = ta.selectionEnd;
+  ta.value = ta.value.substring(0,start) + text + ta.value.substring(end);
+  ta.selectionStart = ta.selectionEnd = start + text.length;
+  ta.focus();
 }
 
-// Debate: append a mono block beneath editor
-document.getElementById('debate-add').addEventListener('click', () => {
-  const who = document.getElementById('debate-agent').value;
-  const text = document.getElementById('debate-text').value.trim();
-  if (!text) return;
-  const block = `\n— ${who} —\n${text}\n`;
+/* ---- Debate ---- */
+$('#debate-add').addEventListener('click', ()=>{
+  const who = $('#debate-agent').value;
+  const text = $('#debate-text').value.trim();
+  if(!text) return;
+  const block = `— ${who} —\n${text}\n`;
   const pre = document.createElement('pre'); pre.className='mono'; pre.textContent = block;
-  elDebateThread.appendChild(pre);
-  document.getElementById('debate-text').value='';
+  $('#debate-thread').appendChild(pre);
+  // also store to current note (as draft)
+  const id = currentId;
+  if(id){
+    const n = state.notes.find(x=>x.id===id);
+    n.debate = n.debate || [];
+    n.debate.push({who, text, at: nowISO()});
+    n.updated_at = nowISO();
+    save();
+  }
+  $('#debate-text').value='';
 });
 
-document.getElementById('debate-toggle').addEventListener('click', () => {
-  const d = document.getElementById('debate'); d.style.display = (d.style.display==='none'?'grid':'none');
-});
+/* initial left render */
+renderLeftList();
 
-// Save note
-document.getElementById('btn-save').addEventListener('click', () => {
-  const n = currentNoteFromEditor();
-  if (!n.title) { alert('Please give the note a title.'); return; }
-  const i = state.notes.findIndex(x=>x.id===n.id);
-  const stamp = new Date().toISOString();
-  if (i>=0){ n.created_at = state.notes[i].created_at; n.updated_at = stamp; state.notes[i] = n; }
-  else { n.created_at = stamp; state.notes.push(n); state.draftId = n.id; }
-  saveAll(); renderLeft(); alert('Saved.');
-});
+/* ========== Library ========== */
+function renderProjectsList(){
+  // projects = tags that start with "project:" or "Project X" style
+  const projMap = {}; 
+  state.notes.forEach(n=>{
+    (n.tags||[]).forEach(t=>{
+      const k = t.toLowerCase().startsWith('project') ? t : (t.startsWith('proj:') ? t : null);
+      if(k) { (projMap[k]=projMap[k]||0); projMap[k]++; }
+    });
+  });
+  const lines = Object.entries(projMap).sort((a,b)=>b[1]-a[1]).map(([k,c])=>`• ${k} (${c})`).join('\n') || '(none)';
+  $('#lib-projects').textContent = lines;
+}
+function renderLibrary(){
+  renderProjectsList();
+  $('#lib-min-links-val').textContent = $('#lib-min-links').value;
+  const size = +$('#lib-size').value;
+  const search = $('#lib-search').value.toLowerCase();
+  const tagFilter = tokenizeTags($('#lib-tag-filter').value);
+  const minLinks = +$('#lib-min-links').value;
+  const newestFirst = $('#lib-sort').checked;
 
-// File attach (metadata only, local)
-document.getElementById('file-attach').addEventListener('change', (e) => {
-  const file = e.target.files[0]; if (!file) return;
-  const n = currentNoteFromEditor(); n.file = {name:file.name, size:file.size};
-  const i = state.notes.findIndex(x=>x.id===(state.draftId||''));
-  if (i>=0){ state.notes[i].file = n.file; }
-  saveAll(); alert('Attached (stored metadata locally).');
-});
+  const {edges} = buildGraph(); const deg = degreeMap(edges);
+  let items = state.notes.slice();
+  if (search){
+    items = items.filter(n => (n.title||'').toLowerCase().includes(search) || (n.content||'').toLowerCase().includes(search));
+  }
+  if (tagFilter.length){
+    items = items.filter(n => tagFilter.every(t => (n.tags||[]).includes(t)));
+  }
+  if (minLinks>0){
+    items = items.filter(n => (deg[n.id]||0) >= minLinks);
+  }
+  items.sort((a,b)=> (newestFirst?1:-1) * (new Date(b.updated_at||b.created_at) - new Date(a.updated_at||a.created_at)));
 
-// Export/Import
-document.getElementById('btn-export').addEventListener('click', () => {
-  const data = JSON.stringify(state, null, 2);
-  const url = URL.createObjectURL(new Blob([data], {type:'application/json'}));
-  const a = document.createElement('a'); a.href=url; a.download='willow_notecard.json'; a.click();
-  setTimeout(()=>URL.revokeObjectURL(url), 500);
-});
-document.getElementById('file-import').addEventListener('change', async (e) => {
-  const file = e.target.files[0]; if (!file) return;
-  try{
-    const text = await file.text();
-    const data = JSON.parse(text);
-    state.notes = data.notes||state.notes;
-    state.suggestions = data.suggestions||state.suggestions;
-    saveAll(); renderAll(); alert('Imported.');
-  } catch { alert('Invalid JSON.'); }
-});
+  const grid = $('#lib-grid');
+  grid.style.gridTemplateColumns = `repeat(auto-fill, minmax(${size}px, 1fr))`;
+  grid.innerHTML = items.map(n => `
+    <article class="card" data-id="${n.id}">
+      <div class="title">${escapeHTML(n.title||'(untitled)')}</div>
+      <div class="preview">${escapeHTML((n.content||'').slice(0,140))}${(n.content||'').length>140?'…':''}</div>
+      <div class="meta">
+        <span class="badge">#${(n.tags||[]).length} tags</span>
+        <span class="badge">${(deg[n.id]||0)} links</span>
+      </div>
+    </article>`).join('') || '<div class="muted">No results.</div>';
 
-// Tabs
-elTabNotes.addEventListener('click', () => { leftMode='notes'; elTabNotes.classList.add('active'); elTabSuggestions.classList.remove('active'); renderLeft(); });
-elTabSuggestions.addEventListener('click', () => { leftMode='suggestions'; elTabSuggestions.classList.add('active'); elTabNotes.classList.remove('active'); renderLeft(); });
+  // click card: open in Notecard and focus in graph
+  $$('#lib-grid .card').forEach(c=>{
+    c.addEventListener('click', ()=>{
+      const id = c.getAttribute('data-id');
+      state.focusId = id; save();
+      location.hash = '#/notecard'; loadNote(id); renderLeftList();
+    });
+  });
+}
+/* library inputs */
+$('#lib-size').addEventListener('input', renderLibrary);
+$('#lib-search').addEventListener('input', renderLibrary);
+$('#lib-tag-filter').addEventListener('input', renderLibrary);
+$('#lib-min-links').addEventListener('input', e=>{ $('#lib-min-links-val').textContent = e.target.value; renderLibrary(); });
+$('#lib-sort').addEventListener('change', renderLibrary);
 
-// Inputs
-document.getElementById('btn-gensuggest').addEventListener('click', generateSuggestions);
-elTags.addEventListener('input', renderTags);
+/* ========== Graph view ========== */
+let cy = null;
+function renderGraph(){
+  $('#gr-breadth-val').textContent = $('#gr-breadth').value;
+  $('#gr-depth-val').textContent = $('#gr-depth').value;
 
-// Initial render
-renderAll();
+  const {edges} = buildGraph();
+  const deg = degreeMap(edges);
+  const breadth = +$('#gr-breadth').value;
+  const focus = state.focusId;
+
+  // nodes
+  const nodesSet = new Set(state.notes.map(n=>n.id));
+  // if depth<max and focus set, restrict to BFS neighborhood
+  let allowed = new Set(nodesSet);
+  const depth = +$('#gr-depth').value;
+  if (focus){
+    const neigh = neighborsMap(edges);
+    allowed = new Set([focus]);
+    let frontier = new Set([focus]);
+    for (let d=0; d<depth; d++){
+      const next = new Set();
+      frontier.forEach(v=>{
+        (neigh[v]||new Set()).forEach(u=> next.add(u));
+      });
+      next.forEach(v=>allowed.add(v));
+      frontier = next;
+    }
+  }
+  // degree filter
+  const filtered = state.notes.filter(n => allowed.has(n.id) && (deg[n.id]||0) >= breadth);
+
+  const elements = [];
+  filtered.forEach(n=>{
+    elements.push({ data: { id: n.id, label: n.title || '(untitled)', degree: deg[n.id]||0 }});
+  });
+  edges.forEach(e=>{
+    if (elements.find(x=>x.data.id===e.from) && elements.find(x=>x.data.id===e.to)){
+      elements.push({ data: { id: e.from+'_'+e.to, source:e.from, target:e.to }});
+    }
+  });
+
+  const container = $('#cy');
+  if (!cy){
+    cy = cytoscape({
+      container,
+      elements,
+      style: [
+        { selector: 'node', style: {
+            'label': 'data(label)', 'text-wrap':'wrap', 'text-max-width': 160, 'font-size': 10,
+            'background-color': '#0ea5e9', 'color': '#0f172a',
+            'width': 'mapData(degree, 0, 12, 20, 60)',
+            'height': 'mapData(degree, 0, 12, 20, 60)',
+            'border-width': 2, 'border-color': '#0f172a'
+        }},
+        { selector: 'edge', style: {
+            'width': 2, 'line-color': '#cbd5e1', 'target-arrow-shape':'triangle', 'target-arrow-color':'#cbd5e1', 'curve-style':'bezier'
+        }},
+        { selector: ':selected', style: {'border-color':'#111827','border-width':4} },
+      ],
+      layout: { name:'cose', animate:true }
+    });
+    cy.on('tap', 'node', evt=>{
+      const id = evt.target.id();
+      state.focusId = id; save();
+      renderCluster();
+      // scroll cluster pane into view
+      $('#cluster-pane').scrollIntoView({behavior:'smooth', block:'center'});
+    });
+  } else {
+    cy.json({ elements });
+    cy.layout({ name:'cose', animate:true }).run();
+  }
+}
+$('#gr-breadth').addEventListener('input', renderGraph);
+$('#gr-depth').addEventListener('input', renderGraph);
+$('#gr-reset-focus').addEventListener('click', ()=>{ state.focusId = null; save(); renderGraph(); renderCluster(); });
+
+/* ========== Card Cluster view ========== */
+function renderCluster(){
+  const size = +$('#cl-size').value;
+  const depth = +$('#cl-depth').value;
+  const focus = state.focusId;
+  const focusNote = state.notes.find(n=>n.id===focus);
+  $('#cl-focus').innerHTML = focusNote
+    ? `<div style="font-weight:700">${escapeHTML(focusNote.title||'(untitled)')}</div>
+       <div class="mono" style="white-space:pre-wrap">${escapeHTML((focusNote.content||'').slice(0,220))}${(focusNote.content||'').length>220?'…':''}</div>
+       <div class="chips" style="margin-top:6px">${(focusNote.tags||[]).map(t=>`<span class="chip">#${escapeHTML(t)}</span>`).join('')}</div>`
+    : '<div class="muted">No focus selected. Click a node in the graph above.</div>';
+
+  const {edges} = buildGraph();
+  const neigh = neighborsMap(edges);
+  const canvas = $('#cl-canvas'); canvas.innerHTML='';
+  $('#cl-links').textContent = '';
+
+  if (!focusNote) return;
+
+  // BFS to given depth
+  const seen = new Set([focus]);
+  let frontier = new Set([focus]);
+  const levels = { [focus]:0 };
+  for (let d=0; d<depth; d++){
+    const next = new Set();
+    frontier.forEach(v=>{
+      (neigh[v]||new Set()).forEach(u=>{
+        if(!seen.has(u)){ seen.add(u); next.add(u); levels[u]=d+1; }
+      });
+    });
+    frontier = next;
+  }
+  seen.delete(focus); // exclude focus itself
+
+  // linked list on side
+  $('#cl-links').textContent = Array.from(seen).map(id => {
+    const n = state.notes.find(x=>x.id===id); return `• (${levels[id]}) ${n?.title||id}`;
+  }).join('\n');
+
+  // render cards
+  Array.from(seen).forEach(id=>{
+    const n = state.notes.find(x=>x.id===id); if(!n) return;
+    const card = document.createElement('article'); card.className='note-card';
+    card.style.width = size+'px';
+    card.innerHTML = `
+      <div style="font-weight:700">${escapeHTML(n.title||'(untitled)')}</div>
+      <div class="mono" style="white-space:pre-wrap">${escapeHTML((n.content||'').slice(0,160))}${(n.content||'').length>160?'…':''}</div>
+      <div class="chips" style="margin-top:6px">${(n.tags||[]).map(t=>`<span class="chip">#${escapeHTML(t)}</span>`).join('')}</div>
+      <div class="row" style="margin-top:6px">
+        <button class="btn" data-open="${n.id}">Open</button>
+        <button class="btn" data-link="${n.title}">[[Link]]</button>
+      </div>
+    `;
+    canvas.appendChild(card);
+  });
+
+  // wire open + link
+  $$('[data-open]').forEach(b => b.addEventListener('click', ()=>{
+    const id = b.getAttribute('data-open');
+    location.hash = '#/notecard'; loadNote(id); renderLeftList();
+  }));
+  $$('[data-link]').forEach(b => b.addEventListener('click', ()=>{
+    const title = b.getAttribute('data-link');
+    location.hash = '#/notecard';
+    const ta = $('#nc-content'); const text = `[[${title}]]`;
+    const start = ta.selectionStart||ta.value.length;
+    ta.value = ta.value.slice(0,start) + text + ta.value.slice(start);
+    ta.selectionStart = ta.selectionEnd = start + text.length; ta.focus();
+  }));
+}
+$('#cl-size').addEventListener('input', renderCluster);
+$('#cl-depth').addEventListener('input', renderCluster);
+
+/* ===== Bootstrapping some demo content if empty ===== */
+if (state.notes.length === 0){
+  const A = {id:uid(), title:'Bank Funding Stress', content:'Deposits are flowing to MMFs. [[CRE Exposures]] and [[Regional Banks]] could amplify.', tags:['banking','risk','project:Monitoring'], created_at:nowISO(), updated_at:nowISO(), debate:[]};
+  const B = {id:uid(), title:'CRE Exposures', content:'Office vacancy high; debt maturities cluster 2026–2027. [[Policy Path]]', tags:['cre','risk','project:Monitoring'], created_at:nowISO(), updated_at:nowISO(), debate:[]};
+  const C = {id:uid(), title:'Policy Path', content:'FOMC guidance suggests higher-for-longer. Watch term premium.', tags:['policy','inflation'], created_at:nowISO(), updated_at:nowISO(), debate:[]};
+  const D = {id:uid(), title:'Regional Banks', content:'Unrealized losses + deposit flight = solvency concerns. [[Bank Funding Stress]]', tags:['banking','project:Monitoring'], created_at:nowISO(), updated_at:nowISO(), debate:[]};
+  state.notes.push(A,B,C,D); save();
+}
+
+/* initial view fills */
+renderLeftList(); renderTagChips();
 </script>
 </body>
 </html>
