@@ -5,9 +5,8 @@
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <title>Willow — Notecard • Library • Graph</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64'%3E%3Ctext y='50' font-size='48'%3E%F0%9F%8C%B2%3C/text%3E%3C/svg%3E">
-<!-- Cytoscape core + non-overlapping layout -->
+<!-- Cytoscape core (built-in COSE layout for reliability) -->
 <script src="https://unpkg.com/cytoscape@3.30.3/dist/cytoscape.min.js"></script>
-<script src="https://unpkg.com/cytoscape-cose-bilkent@4.1.0/cytoscape-cose-bilkent.js"></script>
 <style>
   :root{
     --ink:#222; --muted:#6b7280; --line:#e5e7eb; --bg:#f8fafc; --chip:#f3f4f6;
@@ -48,8 +47,9 @@
   .sugg-item:hover{background:#fafafa}
   .mono{font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;font-size:12px;color:#555}
   .footer{text-align:center;color:#9ca3af;font-size:12px;margin-top:12px}
-  /* Library */
-  .lib{display:grid;grid-template-columns:260px 1fr;gap:16px}
+  /* Library (full width) */
+  .lib{display:block}
+  .lib-controls{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
   .lib-grid{display:grid;gap:12px}
   .card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px;cursor:pointer;display:flex;flex-direction:column}
   .card .title{font-weight:700;font-size:13px;margin-bottom:6px}
@@ -57,12 +57,11 @@
   .card .meta{display:flex;gap:8px;color:#6b7280;font-size:11px;margin-top:6px}
   .sliderrow{display:flex;gap:10px;align-items:center;justify-content:flex-end}
   .badge{border:1px solid var(--line);padding:2px 6px;border-radius:999px;font-size:11px;background:#f9fafb}
-  /* Project “folders” */
-  .folders{max-height:60vh;overflow:auto;scroll-behavior:smooth}
-  .folder{padding:6px;border:1px solid var(--line);border-radius:10px;background:#fff;margin-bottom:6px}
-  .folder-head{display:flex;justify-content:space-between;align-items:center;cursor:pointer}
-  .folder-items{margin-top:6px;padding-left:8px;display:none}
-  .folder.open .folder-items{display:block}
+  /* Project cards pinned at top */
+  .projects-bar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+  .proj-card{display:flex;align-items:center;gap:8px;border:1px solid var(--line);background:#fff;border-radius:999px;padding:6px 10px;cursor:pointer}
+  .proj-card:hover{background:#f3f4f6}
+  .proj-card .count{background:#eef2ff;border:1px solid #c7d2fe;border-radius:999px;padding:2px 6px;font-size:11px}
   /* Graph */
   #cy{height:540px;border:1px solid var(--line);border-radius:12px;background:#fff}
   .controls{display:flex;gap:20px;align-items:center;margin-bottom:10px}
@@ -157,38 +156,32 @@ This reminds me of ...
     </aside>
   </section>
 
-  <!-- ===== Library ===== -->
+  <!-- ===== Library (no sidebar; projects at top as cards) ===== -->
   <section id="view-library" class="lib" style="display:none">
-    <aside class="pane">
+    <div class="pane">
       <h3 style="margin:0 0 8px 0">LIBRARY</h3>
-      <div class="muted" style="margin-bottom:6px">Projects (click a folder to open)</div>
-      <div id="folders" class="folders"></div>
 
-      <div class="divider"></div>
-      <div style="display:grid;gap:8px">
-        <div class="muted" style="margin-top:4px">Filter by</div>
-        <input id="lib-search" type="text" placeholder="Search titles/content"/>
-        <input id="lib-tag-filter" type="text" placeholder="#tag1, #tag2"/>
-        <label class="row"><span class="muted" style="width:120px">Min linkages</span>
-          <input id="lib-min-links" type="range" min="0" max="10" step="1" value="0" style="flex:1">
-          <span id="lib-min-links-val" class="badge">0</span>
-        </label>
-        <label class="row"><span class="muted" style="width:120px">Newest first</span>
-          <input id="lib-sort" type="checkbox" checked>
+      <!-- Projects pinned bar -->
+      <div id="projects-bar" class="projects-bar"></div>
+
+      <!-- Filters + size -->
+      <div class="lib-controls">
+        <input id="lib-search" type="text" placeholder="Search titles/content" style="flex:1;min-width:220px"/>
+        <input id="lib-tag-filter" type="text" placeholder="#tag1, #tag2" style="min-width:220px"/>
+        <span class="muted">Min linkages</span>
+        <input id="lib-min-links" type="range" min="0" max="10" step="1" value="0">
+        <span id="lib-min-links-val" class="badge">0</span>
+        <span class="muted" style="margin-left:10px">Card size</span>
+        <input id="lib-size" type="range" min="160" max="320" step="10" value="220">
+        <label class="row" style="margin-left:6px"><span class="muted">Newest first</span>
+          <input id="lib-sort" type="checkbox" checked style="margin-left:6px">
         </label>
         <button id="lib-clear" class="btn">Clear filters</button>
+        <span id="lib-active-project" class="chip" style="display:none;cursor:pointer" title="Click to clear project filter"></span>
       </div>
-    </aside>
 
-    <section>
-      <div class="row space" style="margin-bottom:8px">
-        <div class="muted">Adjust card size</div>
-        <div class="sliderrow">
-          <input id="lib-size" type="range" min="160" max="320" step="10" value="220">
-        </div>
-      </div>
       <div id="lib-grid" class="lib-grid"></div>
-    </section>
+    </div>
   </section>
 
   <!-- ===== Graph ===== -->
@@ -275,7 +268,7 @@ function show(hash){
   $('#view-notecard').style.display = h==='#/notecard' ? '' : 'none';
   $('#view-library').style.display = h==='#/library' ? '' : 'none';
   $('#view-graph').style.display = h==='#/graph' ? '' : 'none';
-  if (h==='#/library') { renderFolders(); renderLibrary(); }
+  if (h==='#/library') { renderProjectsBar(); renderLibrary(); }
   if (h==='#/graph') { renderGraph(); renderCluster(); }
 }
 window.addEventListener('hashchange', ()=>show());
@@ -330,7 +323,7 @@ function insertSuggestion(s){ const ta=$('#nc-content'); const text=`[[${s.title
 $('#debate-add').addEventListener('click',()=>{ const who=$('#debate-agent').value; const text=$('#debate-text').value.trim(); if(!text) return; const block=`— ${who} —\n${text}\n`; const pre=document.createElement('pre'); pre.className='mono'; pre.textContent=block; $('#debate-thread').appendChild(pre); if(currentId){ const n=state.notes.find(x=>x.id===currentId); n.debate=n.debate||[]; n.debate.push({who,text,at:nowISO()}); n.updated_at=nowISO(); save(); } $('#debate-text').value=''; });
 renderLeftList(); renderTagChips();
 
-/* ===== Library with “folder” projects ===== */
+/* ===== Projects bar at top of Library ===== */
 function getProjectsMap(){
   const map={};
   state.notes.forEach(n=> (n.tags||[]).forEach(t=> {
@@ -341,34 +334,27 @@ function getProjectsMap(){
   }));
   return map;
 }
-function renderFolders(){
-  const host=$('#folders'); host.innerHTML='';
-  const map=getProjectsMap();
-  const names=Object.keys(map).sort((a,b)=>a.localeCompare(b));
-  if(names.length===0){ host.innerHTML='<div class="muted">No projects yet. Add tags like “project:Atlas”.</div>'; return; }
+function renderProjectsBar(){
+  const bar = $('#projects-bar'); bar.innerHTML='';
+  const map = getProjectsMap();
+  const names = Object.keys(map).sort((a,b)=> a.localeCompare(b));
+  if(names.length===0){ bar.innerHTML = '<span class="muted">No projects yet. Add tags like “project:Atlas”.</span>'; return; }
   names.forEach(name=>{
-    const wrap=document.createElement('div'); wrap.className='folder'+(state.libProjectFilter===name?' open':'');
-    wrap.innerHTML=`
-      <div class="folder-head">
-        <div><b>📁 ${escapeHTML(name)}</b> <span class="badge">${map[name].length}</span></div>
-        <div class="muted">Open</div>
-      </div>
-      <div class="folder-items mono"></div>
-    `;
-    const items=wrap.querySelector('.folder-items');
-    items.textContent = map[name].map(id => {
-      const n=state.notes.find(x=>x.id===id); return '• '+(n?.title||id);
-    }).join('\n');
-    // Click project name: "open" the project (apply filter) and expand
-    wrap.querySelector('.folder-head').addEventListener('click',()=>{
+    const card = document.createElement('div'); card.className='proj-card';
+    card.innerHTML = `<span>📁 <b>${escapeHTML(name)}</b></span><span class="count">${map[name].length}</span>`;
+    card.addEventListener('click', ()=>{
       state.libProjectFilter = name; save();
-      wrap.classList.add('open');
       renderLibrary();
-      $('#lib-grid').scrollIntoView({behavior:'smooth',block:'nearest'});
+      const chip = $('#lib-active-project');
+      chip.textContent = `Project: ${name} ✕`;
+      chip.style.display = 'inline-flex';
+      $('#lib-grid').scrollIntoView({behavior:'smooth', block:'nearest'});
     });
-    host.appendChild(wrap);
+    bar.appendChild(card);
   });
 }
+
+/* ===== Library grid ===== */
 function renderLibrary(){
   $('#lib-min-links-val').textContent=$('#lib-min-links').value;
   const size=+$('#lib-size').value;
@@ -406,27 +392,32 @@ $('#lib-search').addEventListener('input', renderLibrary);
 $('#lib-tag-filter').addEventListener('input', renderLibrary);
 $('#lib-min-links').addEventListener('input', e=>{ $('#lib-min-links-val').textContent=e.target.value; renderLibrary(); });
 $('#lib-sort').addEventListener('change', renderLibrary);
-$('#lib-clear').addEventListener('click',()=>{ state.libProjectFilter=null; $('#lib-search').value=''; $('#lib-tag-filter').value=''; $('#lib-min-links').value='0'; $('#lib-min-links-val').textContent='0'; save(); renderFolders(); renderLibrary(); });
+$('#lib-clear').addEventListener('click',()=>{
+  state.libProjectFilter=null;
+  $('#lib-active-project').style.display='none';
+  $('#lib-search').value=''; $('#lib-tag-filter').value='';
+  $('#lib-min-links').value='0'; $('#lib-min-links-val').textContent='0';
+  save(); renderProjectsBar(); renderLibrary();
+});
+$('#lib-active-project').addEventListener('click', ()=>{ state.libProjectFilter=null; save(); renderProjectsBar(); renderLibrary(); });
 
-/* ===== Graph (non-overlapping layout) ===== */
+/* ===== Graph (built-in COSE with strong spacing) ===== */
 let cy=null;
-function nonOverlapLayout(){
+function coseLayout(){
   return {
-    name: 'cose-bilkent',
-    randomize: false,
+    name: 'cose',
     animate: 'end',
     animationDuration: 400,
-    quality: 'proof',
-    nodeDimensionsIncludeLabels: true,
+    nodeRepulsion: 8000,
+    nodeOverlap: 20,
     idealEdgeLength: 120,
     edgeElasticity: 0.1,
-    nodeRepulsion: 6500,
-    gravity: 0.25,
-    gravityRange: 3.8,
-    gravityCompound: 1.0,
-    nestingFactor: 0.9,
+    gravity: 80,
+    numIter: 1000,
     padding: 30,
-    tile: true // helps distribute sparse nodes
+    componentSpacing: 120,
+    coolingFactor: 0.95,
+    minTemp: 1.0
   };
 }
 function renderGraph(){
@@ -455,11 +446,11 @@ function renderGraph(){
         {selector:'edge', style:{'width':2,'line-color':'#cbd5e1','target-arrow-shape':'triangle','target-arrow-color':'#cbd5e1','curve-style':'bezier'}},
         {selector:':selected', style:{'border-color':'#111827','border-width':4}}
       ],
-      layout: nonOverlapLayout()
+      layout: coseLayout()
     });
     cy.on('tap','node',evt=>{ state.focusId=evt.target.id(); save(); renderCluster(); $('#cluster-pane').scrollIntoView({behavior:'smooth',block:'center'}); });
   } else {
-    cy.json({elements:els}); cy.layout(nonOverlapLayout()).run();
+    cy.json({elements:els}); cy.layout(coseLayout()).run();
   }
 }
 $('#gr-breadth').addEventListener('input', renderGraph);
@@ -501,9 +492,9 @@ $('#cl-depth').addEventListener('input', renderCluster);
 
 /* ===== Export / Import (JSON) ===== */
 $('#btn-export').addEventListener('click',()=>{ const data=JSON.stringify({notes:state.notes},null,2); const url=URL.createObjectURL(new Blob([data],{type:'application/json'})); const a=document.createElement('a'); a.href=url; a.download='willow_export.json'; a.click(); setTimeout(()=>URL.revokeObjectURL(url),500); });
-$('#file-import').addEventListener('change',async e=>{ const f=e.target.files[0]; if(!f) return; try{ const text=await f.text(); const data=JSON.parse(text); if(Array.isArray(data)) { state.notes=data; } else if(Array.isArray(data.notes)) { state.notes=data.notes; } else { throw new Error('Invalid JSON structure'); } save(); alert('Imported.'); renderLeftList(); renderFolders(); renderLibrary(); renderGraph(); renderCluster(); } catch{ alert('Invalid JSON.'); } });
+$('#file-import').addEventListener('change',async e=>{ const f=e.target.files[0]; if(!f) return; try{ const text=await f.text(); const data=JSON.parse(text); if(Array.isArray(data)) { state.notes=data; } else if(Array.isArray(data.notes)) { state.notes=data.notes; } else { throw new Error('Invalid JSON structure'); } save(); alert('Imported.'); renderLeftList(); renderProjectsBar(); renderLibrary(); renderGraph(); renderCluster(); } catch{ alert('Invalid JSON.'); } });
 
-/* ===== Small starter if empty (you can delete this block) ===== */
+/* ===== Small starter if empty (safe to remove) ===== */
 if (state.notes.length === 0){
   const A = {id:uid(), title:'Bank Funding Stress', content:'Deposits → MMFs. [[CRE Exposures]] [[Regional Banks]]', tags:['banking','risk','project:Atlas'], created_at:nowISO(), updated_at:nowISO(), debate:[]};
   const B = {id:uid(), title:'CRE Exposures', content:'Office vacancy high; maturities in 26–27. [[Policy Path]]', tags:['cre','risk','project:Borealis'], created_at:nowISO(), updated_at:nowISO(), debate:[]};
@@ -512,7 +503,7 @@ if (state.notes.length === 0){
   state.notes.push(A,B,C,D); save();
 }
 
-/* initial renders when landing */
+/* initial renders */
 renderLeftList(); renderTagChips();
 </script>
 </body>
