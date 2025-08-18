@@ -5,79 +5,50 @@
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <title>Willow — Notecard • Library • Graph</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64'%3E%3Ctext y='50' font-size='48'%3E%F0%9F%8C%B2%3C/text%3E%3C/svg%3E">
-<!-- Cytoscape core (built-in COSE layout for reliability) -->
 <script src="https://unpkg.com/cytoscape@3.30.3/dist/cytoscape.min.js"></script>
 <style>
-  :root{
-    --ink:#222; --muted:#6b7280; --line:#e5e7eb; --bg:#f8fafc; --chip:#f3f4f6;
-    --panel:#ffffff; --btn:#f9fafb; --accent:#111827;
-  }
-  *{box-sizing:border-box}
-  html,body{height:100%}
-  html{scroll-behavior:smooth}
+  :root{--ink:#222;--muted:#6b7280;--line:#e5e7eb;--bg:#f8fafc;--chip:#f3f4f6;--panel:#fff;--btn:#f9fafb}
+  *{box-sizing:border-box} html,body{height:100%} html{scroll-behavior:smooth}
   body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,"Noto Sans",sans-serif}
   header{padding:12px 20px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;background:#fff;position:sticky;top:0;z-index:5}
-  .title{display:flex;gap:10px;align-items:baseline}
-  .title h1{margin:0;font-size:18px}
+  .title{display:flex;gap:10px;align-items:baseline}.title h1{margin:0;font-size:18px}
   .nav{display:flex;gap:8px;align-items:center}
   .nav a{padding:6px 10px;border:1px solid var(--line);border-radius:10px;background:#fff;text-decoration:none;color:inherit}
   .nav a.active{background:#111;color:#fff;border-color:#111}
   .wrap{max-width:1200px;margin:0 auto;padding:16px}
   .grid-3{display:grid;grid-template-columns:260px 1fr 300px;gap:16px}
   .pane{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px}
-  .tabs{display:flex;gap:8px}
-  .tab{padding:6px 10px;border:1px solid var(--line);border-radius:10px;background:#fff;cursor:pointer}
+  .tabs{display:flex;gap:8px}.tab{padding:6px 10px;border:1px solid var(--line);border-radius:10px;background:#fff;cursor:pointer}
   .tab.active{background:#efefef}
   .list{border-top:1px solid var(--line);margin-top:10px;max-height:70vh;overflow:auto;scroll-behavior:smooth}
-  .item{padding:10px;border-bottom:1px dashed #e5e7eb;cursor:pointer}
-  .item .t{font-weight:600}
-  .item .d{color:var(--muted);font-size:12px}
-  .muted{color:var(--muted)}
-  .row{display:flex;gap:10px;align-items:center}
-  .row.space{justify-content:space-between}
+  .item{padding:10px;border-bottom:1px dashed #e5e7eb;cursor:pointer}.item .t{font-weight:600}.muted{color:#6b7280}
+  .row{display:flex;gap:10px;align-items:center}.row.space{justify-content:space-between}
   .btn{background:var(--btn);border:1px solid var(--line);border-radius:10px;padding:8px 12px;cursor:pointer}
-  .btn.primary{background:#111;color:#fff;border-color:#111}
   input[type="text"],textarea,select{width:100%;border:1px solid var(--line);border-radius:10px;padding:10px;background:#fff;font:inherit}
-  textarea{min-height:340px;resize:vertical}
-  .chips{display:flex;gap:6px;flex-wrap:wrap}
-  .chip{background:var(--chip);border:1px solid var(--line);border-radius:999px;padding:4px 8px;font-size:12px}
-  .side-title{font-weight:700;margin:4px 0 8px}
-  .sugg{border-top:1px solid var(--line);padding-top:8px;max-height:50vh;overflow:auto;scroll-behavior:smooth}
+  textarea{min-height:300px;resize:vertical}
+  .chips{display:flex;gap:6px;flex-wrap:wrap}.chip{background:var(--chip);border:1px solid var(--line);border-radius:999px;padding:4px 8px;font-size:12px}
+  .sugg{border-top:1px solid var(--line);padding-top:8px;max-height:50vh;overflow:auto}
   .sugg-item{padding:8px;border:1px dashed #d1d5db;border-radius:10px;margin-bottom:8px;cursor:pointer}
-  .sugg-item:hover{background:#fafafa}
-  .mono{font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;font-size:12px;color:#555}
-  .footer{text-align:center;color:#9ca3af;font-size:12px;margin-top:12px}
-  /* Library (full width) */
+  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono",monospace;font-size:12px;color:#555}
   .lib{display:block}
+  .projects-bar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+  .proj-card{display:flex;align-items:center;gap:8px;border:1px solid var(--line);background:#fff;border-radius:999px;padding:6px 10px;cursor:pointer}
+  .proj-card .count{background:#eef2ff;border:1px solid #c7d2fe;border-radius:999px;padding:2px 6px;font-size:11px}
   .lib-controls{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
   .lib-grid{display:grid;gap:12px}
   .card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px;cursor:pointer;display:flex;flex-direction:column}
-  .card .title{font-weight:700;font-size:13px;margin-bottom:6px}
-  .card .preview{color:var(--muted);font-size:12px;flex:1}
+  .card .title{font-weight:700;font-size:13px;margin-bottom:6px}.card .preview{color:#6b7280;font-size:12px;flex:1}
   .card .meta{display:flex;gap:8px;color:#6b7280;font-size:11px;margin-top:6px}
-  .sliderrow{display:flex;gap:10px;align-items:center;justify-content:flex-end}
-  .badge{border:1px solid var(--line);padding:2px 6px;border-radius:999px;font-size:11px;background:#f9fafb}
-  /* Project cards pinned at top */
-  .projects-bar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px}
-  .proj-card{display:flex;align-items:center;gap:8px;border:1px solid var(--line);background:#fff;border-radius:999px;padding:6px 10px;cursor:pointer}
-  .proj-card:hover{background:#f3f4f6}
-  .proj-card .count{background:#eef2ff;border:1px solid #c7d2fe;border-radius:999px;padding:2px 6px;font-size:11px}
-  /* Graph */
-  #cy{height:540px;border:1px solid var(--line);border-radius:12px;background:#fff}
-  .controls{display:flex;gap:20px;align-items:center;margin-bottom:10px}
-  .control{display:flex;gap:8px;align-items:center}
-  .divider{height:1px;background:var(--line);margin:10px 0}
-  /* Cluster */
-  .cluster{display:grid;grid-template-columns:220px 1fr;gap:16px}
-  .cluster-canvas{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-start}
-  .note-card{border:1px solid var(--line);border-radius:12px;background:#fff;padding:10px}
+  #cy{height:520px;border:1px solid var(--line);border-radius:12px;background:#fff}
+  .controls{display:flex;gap:20px;align-items:center;margin-bottom:10px}.badge{border:1px solid var(--line);padding:2px 6px;border-radius:999px;font-size:11px;background:#f9fafb}
+  .cluster{display:grid;grid-template-columns:220px 1fr;gap:16px}.note-card{border:1px solid var(--line);border-radius:12px;background:#fff;padding:10px}
+  .footer{text-align:center;color:#9ca3af;font-size:12px;margin-top:12px}
 </style>
 </head>
 <body>
 <header>
   <div class="title">
-    <h1>Willow</h1>
-    <span class="muted">Notecard • Library • Graph</span>
+    <h1>Willow</h1><span class="muted">Notecard • Library • Graph</span>
   </div>
   <nav class="nav">
     <a href="#/notecard" id="nav-notecard" class="active">Notecard</a>
@@ -85,426 +56,270 @@
     <a href="#/graph" id="nav-graph">Graph</a>
     <span class="muted" style="margin-left:12px">•</span>
     <button id="btn-export" class="btn">Export</button>
-    <label class="btn" style="cursor:pointer">
-      <input id="file-import" type="file" accept="application/json" style="display:none"> Import
-    </label>
+    <label class="btn" style="cursor:pointer"><input id="file-import" type="file" accept="application/json" style="display:none"> Import</label>
   </nav>
 </header>
 
 <main class="wrap">
-  <!-- ===== Notecard ===== -->
+  <!-- Notecard -->
   <section id="view-notecard" class="grid-3">
-    <!-- Left column -->
     <aside class="pane">
-      <div class="tabs">
-        <button id="tab-notes" class="tab active">Notes</button>
-        <button id="tab-suggestions" class="tab">Suggestions</button>
-      </div>
+      <div class="tabs"><button id="tab-notes" class="tab active">Notes</button><button id="tab-suggestions" class="tab">Suggestions</button></div>
       <div id="left-list" class="list"></div>
     </aside>
-
-    <!-- Middle editor -->
     <section class="pane">
-      <div class="field"><input id="nc-title" type="text" placeholder="Title (new note)"/></div>
-      <div class="field">
-        <textarea id="nc-content" placeholder="Text (new note)
+      <input id="nc-title" type="text" placeholder="Title (new note)"/>
+      <textarea id="nc-content" placeholder="Text (new note)
 
-The lazy brown fox jumps over the hedge.
-
-[[drafted links]]
-[[suggested links added if clicked]]"></textarea>
-      </div>
+[[wikilinks]] supported."></textarea>
       <div class="row space">
         <div class="row">
           <button id="btn-save-note" class="btn">Save</button>
           <button id="btn-new-note" class="btn">New</button>
         </div>
-        <label class="btn">
-          <input id="file-attach" type="file" style="display:none"> FILE
-        </label>
+        <label class="btn"><input id="file-attach" type="file" style="display:none"> FILE</label>
       </div>
-      <div class="field" style="margin-top:10px">
-        <input id="nc-tags" type="text" placeholder="#Tags   #drafted tags; suggested"/>
-        <div id="tag-chips" class="chips" style="margin-top:6px"></div>
-      </div>
-      <div id="debate-thread" class="mono"></div>
-    </section>
-
-    <!-- Right column -->
-    <aside class="pane">
-      <div class="row space">
-        <div class="side-title">Suggested Links</div>
-        <button class="btn" id="btn-run-suggest">Suggested Links</button>
-      </div>
-      <div id="suggested" class="sugg"></div>
-
-      <div class="divider"></div>
-      <div class="row space">
-        <div class="side-title">Debate</div>
+      <input id="nc-tags" type="text" placeholder="#Tags   comma or #prefix"/>
+      <div id="tag-chips" class="chips" style="margin-top:6px"></div>
+      <div class="row" style="margin-top:10px">
         <select id="debate-agent" style="width:auto">
           <option value="Historian">Historian</option>
           <option value="Economist">Economist</option>
           <option value="Contrarian">Contrarian</option>
-          <option value="Blind Spot">Blind Spot</option>
+          <option value="BlindSpot">Blind Spot</option>
           <option value="Interconnectedness">Interconnectedness</option>
         </select>
+        <button id="debate-ask" class="btn">Ask AI</button>
+        <button id="debate-add" class="btn">Add to note</button>
       </div>
-      <textarea id="debate-text" rows="7" placeholder="Historian —
-This reminds me of ...
-..."></textarea>
-      <button id="debate-add" class="btn" style="margin-top:6px">Add</button>
+      <pre id="debate-output" class="mono" style="white-space:pre-wrap"></pre>
+    </section>
+    <aside class="pane">
+      <div class="row space"><div class="muted">Suggested Links</div><button class="btn" id="btn-run-suggest">Run</button></div>
+      <div id="suggested" class="sugg"></div>
     </aside>
   </section>
 
-  <!-- ===== Library (no sidebar; projects at top as cards) ===== -->
+  <!-- Library -->
   <section id="view-library" class="lib" style="display:none">
     <div class="pane">
-      <h3 style="margin:0 0 8px 0">LIBRARY</h3>
-
-      <!-- Projects pinned bar -->
+      <h3 style="margin:0 0 8px">LIBRARY</h3>
       <div id="projects-bar" class="projects-bar"></div>
-
-      <!-- Filters + size -->
       <div class="lib-controls">
-        <input id="lib-search" type="text" placeholder="Search titles/content" style="flex:1;min-width:220px"/>
-        <input id="lib-tag-filter" type="text" placeholder="#tag1, #tag2" style="min-width:220px"/>
-        <span class="muted">Min linkages</span>
-        <input id="lib-min-links" type="range" min="0" max="10" step="1" value="0">
-        <span id="lib-min-links-val" class="badge">0</span>
-        <span class="muted" style="margin-left:10px">Card size</span>
-        <input id="lib-size" type="range" min="160" max="320" step="10" value="220">
-        <label class="row" style="margin-left:6px"><span class="muted">Newest first</span>
-          <input id="lib-sort" type="checkbox" checked style="margin-left:6px">
-        </label>
-        <button id="lib-clear" class="btn">Clear filters</button>
-        <span id="lib-active-project" class="chip" style="display:none;cursor:pointer" title="Click to clear project filter"></span>
+        <input id="lib-search" type="text" placeholder="Search titles/content" style="flex:1;min-width:200px"/>
+        <input id="lib-tag-filter" type="text" placeholder="#tag1, #tag2" style="min-width:200px"/>
+        <span class="muted">Min linkages</span><input id="lib-min-links" type="range" min="0" max="10" step="1" value="0"><span id="lib-min-links-val" class="badge">0</span>
+        <span class="muted">Card size</span><input id="lib-size" type="range" min="160" max="320" step="10" value="220">
+        <label class="row"><span class="muted">Newest first</span><input id="lib-sort" type="checkbox" checked style="margin-left:6px"></label>
+        <span id="lib-active-project" class="chip" style="display:none;cursor:pointer" title="Click to clear">Project: —</span>
+        <button id="lib-clear" class="btn">Clear</button>
       </div>
-
       <div id="lib-grid" class="lib-grid"></div>
     </div>
   </section>
 
-  <!-- ===== Graph ===== -->
+  <!-- Graph -->
   <section id="view-graph" style="display:none">
     <div class="pane">
-      <h3 style="margin:0 0 8px 0">GRAPH</h3>
+      <h3 style="margin:0 0 8px">GRAPH</h3>
       <div class="controls">
-        <div class="control">
-          <span class="muted">Breadth (min degree)</span>
-          <input id="gr-breadth" type="range" min="0" max="10" step="1" value="0">
-          <span id="gr-breadth-val" class="badge">0</span>
-        </div>
-        <div class="control">
-          <span class="muted">Depth (hops from focus)</span>
-          <input id="gr-depth" type="range" min="1" max="6" step="1" value="6">
-          <span id="gr-depth-val" class="badge">6</span>
-        </div>
-        <div class="control"><button class="btn" id="gr-reset-focus">Clear focus</button></div>
+        <div><span class="muted">Breadth</span> <input id="gr-breadth" type="range" min="0" max="10" step="1" value="0"> <span id="gr-breadth-val" class="badge">0</span></div>
+        <div><span class="muted">Depth</span> <input id="gr-depth" type="range" min="1" max="6" step="1" value="6"> <span id="gr-depth-val" class="badge">6</span></div>
+        <button id="gr-reset-focus" class="btn">Clear focus</button>
       </div>
       <div id="cy"></div>
-      <div class="muted" style="margin-top:8px">Tip: click a node to switch to the Card Cluster view.</div>
     </div>
-
     <div class="pane" id="cluster-pane" style="margin-top:16px">
       <div class="row space">
         <h3 style="margin:0">GRAPH: Card Cluster</h3>
-        <div class="row">
-          <span class="muted">Card size</span>
-          <input id="cl-size" type="range" min="160" max="320" step="10" value="220">
-          <span class="muted" style="margin-left:8px">Depth</span>
-          <input id="cl-depth" type="range" min="1" max="5" step="1" value="1">
-        </div>
+        <div class="row"><span class="muted">Card size</span><input id="cl-size" type="range" min="160" max="320" step="10" value="220"><span class="muted">Depth</span><input id="cl-depth" type="range" min="1" max="5" step="1" value="1"></div>
       </div>
       <div class="cluster">
-        <aside>
-          <div class="muted">Focus Note</div>
-          <div id="cl-focus" class="note-card"></div>
-          <div class="divider"></div>
-          <div class="muted">Linked notes</div>
-          <div id="cl-links" class="mono" style="font-size:12px"></div>
-        </aside>
+        <aside><div class="muted">Focus Note</div><div id="cl-focus" class="note-card"></div><div class="muted" style="margin:8px 0">Linked notes</div><div id="cl-links" class="mono" style="font-size:12px"></div></aside>
         <section id="cl-canvas" class="cluster-canvas"></section>
       </div>
     </div>
   </section>
 
-  <div class="footer">Local-first. All data is stored in your browser (localStorage). © 2025</div>
+  <div class="footer">Local-first. All data is in your browser (localStorage). © 2025</div>
 </main>
 
 <script>
-/* ===== Utilities ===== */
-const $ = s => document.querySelector(s);
-const $$ = s => Array.from(document.querySelectorAll(s));
-const escapeHTML = s => (''+s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
-const uid = () => crypto.randomUUID ? crypto.randomUUID() : (Date.now()+Math.random()).toString(36);
-const nowISO = () => new Date().toISOString();
-const oneSentence = s => { s=(s||'').replace(/\s+/g,' ').trim(); const i=s.indexOf('.'); return (i>40? s.slice(0,140)+'…' : (i>0? s.slice(0,i+1): s.slice(0,140)))||'(no description)'; };
-const tokenizeTags = s => (s||'').split(',').map(x=>x.trim().replace(/^#/,'')).filter(Boolean);
+/* ---------- Config ---------- */
+const AGENT_API = 'https://YOUR_WORKER_SUBDOMAIN.workers.dev/agent'; // <-- set to your worker URL
+const PROMPTS_URL = 'prompts.json';
 
-/* ===== State ===== */
-const state = {
-  notes: JSON.parse(localStorage.getItem('wl_notes')||'[]'),
-  focusId: localStorage.getItem('wl_focusId') || null,
-  libProjectFilter: localStorage.getItem('wl_proj') || null,
-};
-const save = () => { localStorage.setItem('wl_notes', JSON.stringify(state.notes)); localStorage.setItem('wl_focusId', state.focusId || ''); localStorage.setItem('wl_proj', state.libProjectFilter||''); };
+/* ---------- Helpers ---------- */
+const $=s=>document.querySelector(s), $$=s=>Array.from(document.querySelectorAll(s));
+const esc=s=>(''+s).replace(/[&<>"']/g,m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]));
+const uid=()=>crypto.randomUUID?crypto.randomUUID():(Date.now()+Math.random()).toString(36);
+const now=()=>new Date().toISOString();
+const oneSentence=s=>{s=(s||'').replace(/\s+/g,' ').trim();const i=s.indexOf('.');return (i>40?s.slice(0,140)+'…':(i>0?s.slice(0,i+1):s.slice(0,140)))||'(no description)';};
+const tagsOf=s=>(s||'').split(',').map(x=>x.trim().replace(/^#/,'')).filter(Boolean);
 
-/* ===== Links/Graph helpers ===== */
-function extractLinks(text){ const out=[]; if(!text) return out; const re=/\[\[([^\]]+)\]\]/g; let m; while((m=re.exec(text))!==null){ out.push(m[1].trim()); } return out; }
-function buildGraph(){
-  const titleToId={}; state.notes.forEach(n=>{ if(n.title) titleToId[n.title]=n.id; });
-  const edges=[]; state.notes.forEach(n=>{ extractLinks(n.content).forEach(t=>{ const to = titleToId[t]; if(to && to!==n.id) edges.push({from:n.id,to}); }); });
-  return {edges};
+/* ---------- Global state ---------- */
+let cy=null; // ensure this exists before router calls renderGraph()
+const st={ notes: JSON.parse(localStorage.getItem('wl_notes')||'[]'), focusId: localStorage.getItem('wl_focusId')||null, projFilter: localStorage.getItem('wl_proj')||null, prompts:{} };
+const persist=()=>{ localStorage.setItem('wl_notes', JSON.stringify(st.notes)); localStorage.setItem('wl_focusId', st.focusId||''); localStorage.setItem('wl_proj', st.projFilter||''); };
+
+/* ---------- Graph helpers ---------- */
+function wlExtract(text){const out=[];if(!text)return out;const re=/\[\[([^\]]+)\]\]/g;let m;while((m=re.exec(text))!==null)out.push(m[1].trim());return out;}
+function wlBuild(){const t2i={};st.notes.forEach(n=>{if(n.title)t2i[n.title]=n.id});const edges=[];st.notes.forEach(n=>wlExtract(n.content).forEach(t=>{const to=t2i[t];if(to&&to!==n.id)edges.push({from:n.id,to})}));return {edges};}
+const wlDeg=E=>{const d={};E.forEach(e=>{d[e.from]=(d[e.from]||0)+1;d[e.to]=(d[e.to]||0)+1});return d;}
+const wlNeigh=E=>{const m={};E.forEach(e=>{(m[e.from]=m[e.from]||new Set()).add(e.to);(m[e.to]=m[e.to]||new Set()).add(e.from)});return m;}
+
+/* ---------- Router ---------- */
+function show(h){h=h||location.hash||'#/notecard';
+  $('#nav-notecard').classList.toggle('active',h==='#/notecard');
+  $('#nav-library').classList.toggle('active',h==='#/library');
+  $('#nav-graph').classList.toggle('active',h==='#/graph');
+  $('#view-notecard').style.display=h==='#/notecard'?'':'none';
+  $('#view-library').style.display=h==='#/library'?'':'none';
+  $('#view-graph').style.display=h==='#/graph'?'':'none';
+  if(h==='#/library'){renderProjectsBar();renderLibrary();}
+  if(h==='#/graph'){renderGraph();renderCluster();}
 }
-function degreeMap(edges){ const d={}; edges.forEach(e=>{ d[e.from]=(d[e.from]||0)+1; d[e.to]=(d[e.to]||0)+1; }); return d; }
-function neighborsMap(edges){ const map={}; edges.forEach(e=>{ (map[e.from]=map[e.from]||new Set()).add(e.to); (map[e.to]=map[e.to]||new Set()).add(e.from); }); return map; }
+addEventListener('hashchange',()=>show()); show();
 
-/* ===== Router ===== */
-function show(hash){
-  const h = hash || location.hash || '#/notecard';
-  $('#nav-notecard').classList.toggle('active', h==='#/notecard');
-  $('#nav-library').classList.toggle('active', h==='#/library');
-  $('#nav-graph').classList.toggle('active', h==='#/graph');
-  $('#view-notecard').style.display = h==='#/notecard' ? '' : 'none';
-  $('#view-library').style.display = h==='#/library' ? '' : 'none';
-  $('#view-graph').style.display = h==='#/graph' ? '' : 'none';
-  if (h==='#/library') { renderProjectsBar(); renderLibrary(); }
-  if (h==='#/graph') { renderGraph(); renderCluster(); }
-}
-window.addEventListener('hashchange', ()=>show());
-show();
-
-/* ===== Notecard ===== */
+/* ---------- Notecard ---------- */
 let leftMode='notes', currentId=null;
-function renderLeftList(){
-  const host=$('#left-list'); host.innerHTML='';
+function renderLeft(){const host=$('#left-list');host.innerHTML='';
   if(leftMode==='notes'){
-    if(state.notes.length===0){ host.innerHTML='<div class="item muted">No notes saved.</div>'; return; }
-    state.notes.slice().sort((a,b)=> new Date(b.updated_at||b.created_at)-new Date(a.updated_at||a.created_at)).forEach(n=>{
-      const div=document.createElement('div'); div.className='item';
-      div.innerHTML=`<div class="t">${escapeHTML(n.title||'(untitled)')}</div><div class="d">${escapeHTML(oneSentence(n.content))}</div>`;
-      div.addEventListener('click',()=>loadNote(n.id));
-      host.appendChild(div);
-    });
-  } else {
-    const suggs = computeSuggestions(currentNoteDraft());
-    if(suggs.length===0){ host.innerHTML='<div class="item muted">No suggestions. Click “Suggested Links”.</div>'; return; }
-    suggs.forEach(s=>{ const div=document.createElement('div'); div.className='item'; div.innerHTML=`<div class="t">${escapeHTML(s.title)}</div><div class="d">${escapeHTML(s.reason)}</div>`; div.addEventListener('click',()=>insertSuggestion(s)); host.appendChild(div); });
+    if(st.notes.length===0){host.innerHTML='<div class="item muted">No notes saved.</div>';return;}
+    st.notes.slice().sort((a,b)=>new Date(b.updated_at||b.created_at)-new Date(a.updated_at||a.created_at))
+      .forEach(n=>{const d=document.createElement('div');d.className='item';d.innerHTML=`<div class="t">${esc(n.title||'(untitled)')}</div><div class="muted">${esc(oneSentence(n.content))}</div>`;d.onclick=()=>load(n.id);host.appendChild(d);});
+  } else { renderSuggestions(); }
+}
+$('#tab-notes').onclick=()=>{leftMode='notes';$('#tab-notes').classList.add('active');$('#tab-suggestions').classList.remove('active');renderLeft();}
+$('#tab-suggestions').onclick=()=>{leftMode='suggestions';$('#tab-suggestions').classList.add('active');$('#tab-notes').classList.remove('active');renderLeft();}
+
+function chipTags(){const t=tagsOf($('#nc-tags').value);$('#tag-chips').innerHTML=t.map(x=>`<span class="chip">#${esc(x)}</span>`).join('');}
+$('#nc-tags').oninput=chipTags;
+
+function load(id){const n=st.notes.find(x=>x.id===id);if(!n)return;currentId=id;$('#nc-title').value=n.title||'';$('#nc-content').value=n.content||'';$('#nc-tags').value=(n.tags||[]).join(', ');chipTags();}
+const draft=()=>({id:currentId||uid(),title:$('#nc-title').value.trim(),content:$('#nc-content').value,tags:tagsOf($('#nc-tags').value)});
+$('#btn-new-note').onclick=()=>{currentId=null;$('#nc-title').value='';$('#nc-content').value='';$('#nc-tags').value='';chipTags();}
+$('#btn-save-note').onclick=()=>{const n=draft();if(!n.title){alert('Title, please.');return;}const i=st.notes.findIndex(x=>x.id===n.id);const t=now();if(i>=0)st.notes[i]={...st.notes[i],...n,updated_at:t};else st.notes.push({...n,created_at:t,updated_at:t,debate:[]});persist();renderLeft();alert('Saved.');};
+$('#file-attach').onchange=e=>{const f=e.target.files[0];if(!f)return;if(!currentId){alert('Save the note first, then attach.');return;}const i=st.notes.findIndex(x=>x.id===currentId);st.notes[i].file={name:f.name,size:f.size,type:f.type};persist();alert('Attached (metadata only).');};
+
+/* suggestions (simple heuristic) */
+function suggestFor(n){const {edges}=wlBuild();const deg=wlDeg(edges);const kw=new Set((n.title||'').toLowerCase().split(/\W+/).filter(x=>x.length>3));const out=[];
+  st.notes.forEach(m=>{if(!m.title||m.id===n.id)return;const tagO=(m.tags||[]).filter(t=>(n.tags||[]).includes(t));
+    const wordO=(m.title||'').toLowerCase().split(/\W+/).filter(x=>x.length>3&&kw.has(x));
+    const score=tagO.length*2+wordO.length+(deg[m.id]||0)*0.1;if(score>0)out.push({id:m.id,title:m.title,reason:`Tags:${tagO.join(',')||'—'} Words:${wordO.join(',')||'—'} Links:${deg[m.id]||0}`});});
+  out.sort((a,b)=>b.reason.length-a.reason.length);return out.slice(0,12);
+}
+function renderSuggestions(){const host=$('#suggested');host.innerHTML='';const items=suggestFor(draft());if(items.length===0){host.innerHTML='<div class="muted">No suggestions yet.</div>';return;}
+  items.forEach(s=>{const d=document.createElement('div');d.className='sugg-item';d.innerHTML=`<b>${esc(s.title)}</b><div class="muted">${esc(s.reason)}</div>`;d.onclick=()=>{const ta=$('#nc-content');const txt=`[[${s.title}]]`;const p=ta.selectionStart||ta.value.length;ta.value=ta.value.slice(0,p)+txt+ta.value.slice(p);ta.selectionStart=ta.selectionEnd=p+txt.length;ta.focus();};host.appendChild(d);});
+}
+$('#btn-run-suggest').onclick=renderSuggestions;
+
+/* ---------- Agents (uses prompts.json + Cloudflare Worker) ---------- */
+async function loadPrompts(){
+  try{const res=await fetch(PROMPTS_URL,{cache:'no-store'}); st.prompts=await res.json();}
+  catch{st.prompts={};}
+}
+loadPrompts();
+
+async function askAgent(){
+  const agentKey=$('#debate-agent').value;
+  const P=st.prompts[agentKey]||{system:'You are a helpful expert.',user:'Note title: {title}\nNote text:\n{text}\nGive insights.'};
+  const note=draft();
+  const body={
+    system: P.system,
+    user: (P.user||'').replaceAll('{title}', note.title||'').replaceAll('{text}', note.content||''),
+    temperature: P.temperature ?? 0.7,
+    model: P.model || 'gpt-4o-mini'
+  };
+  $('#debate-output').textContent='Thinking…';
+  try{
+    const r=await fetch(AGENT_API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    if(!r.ok) throw new Error(await r.text());
+    const data=await r.json();
+    $('#debate-output').textContent=data.text || data.output || '(no text)';
+  }catch(err){
+    $('#debate-output').textContent='Agent error: '+err.message+'\nCheck AGENT_API URL and your worker.';
   }
 }
-$('#tab-notes').addEventListener('click',()=>{ leftMode='notes'; $('#tab-notes').classList.add('active'); $('#tab-suggestions').classList.remove('active'); renderLeftList(); });
-$('#tab-suggestions').addEventListener('click',()=>{ leftMode='suggestions'; $('#tab-suggestions').classList.add('active'); $('#tab-notes').classList.remove('active'); renderLeftList(); });
+$('#debate-ask').onclick=askAgent;
+$('#debate-add').onclick=()=>{const t=$('#debate-output').textContent.trim(); if(!t){alert('Ask AI first, or type something.');return;} const n=st.notes.find(x=>x.id===currentId); if(!n){alert('Save the note first.');return;} n.debate=n.debate||[]; n.debate.push({who:$('#debate-agent').value,text:t,at:now()}); n.updated_at=now(); persist(); alert('Added to note.'); };
 
-function renderTagChips(){ const tags=tokenizeTags($('#nc-tags').value); $('#tag-chips').innerHTML=tags.map(t=>`<span class="chip">#${escapeHTML(t)}</span>`).join(''); }
-$('#nc-tags').addEventListener('input', renderTagChips);
-
-function loadNote(id){ const n=state.notes.find(x=>x.id===id); if(!n) return; currentId=id; $('#nc-title').value=n.title||''; $('#nc-content').value=n.content||''; $('#nc-tags').value=(n.tags||[]).join(', '); renderTagChips(); }
-function currentNoteDraft(){ return { id: currentId||uid(), title: $('#nc-title').value.trim(), content: $('#nc-content').value, tags: tokenizeTags($('#nc-tags').value) }; }
-
-$('#btn-new-note').addEventListener('click',()=>{ currentId=null; $('#nc-title').value=''; $('#nc-content').value=''; $('#nc-tags').value=''; renderTagChips(); });
-$('#btn-save-note').addEventListener('click',()=>{ const n=currentNoteDraft(); if(!n.title){ alert('Please add a title.'); return; } const i=state.notes.findIndex(x=>x.id===n.id); const t=nowISO(); if(i>=0){ state.notes[i]={...state.notes[i], ...n, updated_at:t}; }else{ state.notes.push({...n, created_at:t, updated_at:t, debate:[]}); } save(); renderLeftList(); alert('Saved.'); });
-
-$('#file-attach').addEventListener('change',ev=>{ const f=ev.target.files[0]; if(!f) return; if(!currentId){ alert('Save the note first, then attach.'); return; } const i=state.notes.findIndex(x=>x.id===currentId); state.notes[i].file={name:f.name,size:f.size,type:f.type}; save(); alert('Attached (metadata stored locally).'); });
-
-/* Notecard agents */
-function tagAgent(note){
-  const text=(note.title+' '+note.content).toLowerCase();
-  const dict={banking:['bank','deposit','liquidity','loan','mmf'], inflation:['inflation','cpi','prices','wages'], growth:['gdp','growth','output'], cre:['real estate','office','rent','vacancy','cap'], energy:['oil','gas','energy','opec'], policy:['fomc','rates','policy','fed','tighten','ease'], risk:['volatility','cds','stress','default','contagion']};
-  const picks=[]; Object.entries(dict).forEach(([tag,words])=>{ if(words.some(w=>text.includes(w))) picks.push(tag); }); return picks.slice(0,5);
-}
-function computeSuggestions(note){
-  const {edges}=buildGraph(); const deg=degreeMap(edges);
-  const kw=new Set((note.title||'').toLowerCase().split(/\W+/).filter(x=>x.length>3));
-  const out=[]; state.notes.forEach(n=>{ if(!n.title||n.id===note.id) return; const tagOverlap=(n.tags||[]).filter(t=>(note.tags||[]).includes(t)); const wordOverlap=(n.title||'').toLowerCase().split(/\W+/).filter(x=>x.length>3&&kw.has(x)); const score=tagOverlap.length*2+wordOverlap.length+(deg[n.id]||0)*0.1; if(score>0){ out.push({id:n.id,title:n.title,reason:`Tags: ${tagOverlap.join(', ')||'—'} • Words: ${wordOverlap.join(', ')||'—'} • Links: ${deg[n.id]||0}`}); }}); out.sort((a,b)=> b.reason.length-a.reason.length); return out.slice(0,12);
-}
-function renderSuggestions(){ const host=$('#suggested'); host.innerHTML=''; const note=currentNoteDraft(); const items=computeSuggestions(note); if(items.length===0){ host.innerHTML='<div class="muted">No suggestions yet. Try saving a few notes and adding tags.</div>'; return; } items.forEach(s=>{ const div=document.createElement('div'); div.className='sugg-item'; div.innerHTML=`<div><b>${escapeHTML(s.title)}</b></div><div class="muted" style="font-size:12px">${escapeHTML(s.reason)}</div>`; div.addEventListener('click',()=>insertSuggestion(s)); host.appendChild(div); }); }
-$('#btn-run-suggest').addEventListener('click',()=>{ const note=currentNoteDraft(); const tags=new Set(note.tags); tagAgent(note).forEach(t=>tags.add(t)); $('#nc-tags').value=Array.from(tags).join(', '); renderTagChips(); renderSuggestions(); });
-function insertSuggestion(s){ const ta=$('#nc-content'); const text=`[[${s.title}]]`; const start=ta.selectionStart, end=ta.selectionEnd; ta.value=ta.value.substring(0,start)+text+ta.value.substring(end); ta.selectionStart=ta.selectionEnd=start+text.length; ta.focus(); }
-$('#debate-add').addEventListener('click',()=>{ const who=$('#debate-agent').value; const text=$('#debate-text').value.trim(); if(!text) return; const block=`— ${who} —\n${text}\n`; const pre=document.createElement('pre'); pre.className='mono'; pre.textContent=block; $('#debate-thread').appendChild(pre); if(currentId){ const n=state.notes.find(x=>x.id===currentId); n.debate=n.debate||[]; n.debate.push({who,text,at:nowISO()}); n.updated_at=nowISO(); save(); } $('#debate-text').value=''; });
-renderLeftList(); renderTagChips();
-
-/* ===== Projects bar at top of Library ===== */
-function getProjectsMap(){
-  const map={};
-  state.notes.forEach(n=> (n.tags||[]).forEach(t=> {
-    const lower=t.toLowerCase();
-    if(lower.startsWith('project') || lower.startsWith('proj:')){
-      (map[t]=map[t]||[]).push(n.id);
-    }
-  }));
-  return map;
-}
-function renderProjectsBar(){
-  const bar = $('#projects-bar'); bar.innerHTML='';
-  const map = getProjectsMap();
-  const names = Object.keys(map).sort((a,b)=> a.localeCompare(b));
-  if(names.length===0){ bar.innerHTML = '<span class="muted">No projects yet. Add tags like “project:Atlas”.</span>'; return; }
-  names.forEach(name=>{
-    const card = document.createElement('div'); card.className='proj-card';
-    card.innerHTML = `<span>📁 <b>${escapeHTML(name)}</b></span><span class="count">${map[name].length}</span>`;
-    card.addEventListener('click', ()=>{
-      state.libProjectFilter = name; save();
-      renderLibrary();
-      const chip = $('#lib-active-project');
-      chip.textContent = `Project: ${name} ✕`;
-      chip.style.display = 'inline-flex';
-      $('#lib-grid').scrollIntoView({behavior:'smooth', block:'nearest'});
-    });
-    bar.appendChild(card);
+/* ---------- Projects pinned bar ---------- */
+function projectsMap(){const m={};st.notes.forEach(n=>(n.tags||[]).forEach(t=>{const l=t.toLowerCase();if(l.startsWith('project')||l.startsWith('proj:'))(m[t]=m[t]||[]).push(n.id);}));return m;}
+function renderProjectsBar(){const bar=$('#projects-bar');bar.innerHTML='';const map=projectsMap();const names=Object.keys(map).sort((a,b)=>a.localeCompare(b));
+  if(!names.length){bar.innerHTML='<span class="muted">No projects yet. Add tags like “project:Atlas”.</span>';return;}
+  names.forEach(name=>{const c=document.createElement('div');c.className='proj-card';c.innerHTML=`📁 <b>${esc(name)}</b> <span class="count">${map[name].length}</span>`;
+    c.onclick=()=>{st.projFilter=name;persist();$('#lib-active-project').textContent=`Project: ${name} ✕`;$('#lib-active-project').style.display='inline-flex';renderLibrary();};
+    bar.appendChild(c);
   });
 }
 
-/* ===== Library grid ===== */
+/* ---------- Library ---------- */
 function renderLibrary(){
   $('#lib-min-links-val').textContent=$('#lib-min-links').value;
-  const size=+$('#lib-size').value;
-  const search=$('#lib-search').value.toLowerCase();
-  const tagFilter=tokenizeTags($('#lib-tag-filter').value);
-  const minLinks=+$('#lib-min-links').value;
-  const newestFirst=$('#lib-sort').checked;
-  const project=state.libProjectFilter;
-
-  const {edges}=buildGraph(); const deg=degreeMap(edges);
-  let items=state.notes.slice();
-
-  if(project){
-    const projSet=new Set(getProjectsMap()[project]||[]);
-    items=items.filter(n=>projSet.has(n.id));
-  }
-  if(search){ items=items.filter(n=>(n.title||'').toLowerCase().includes(search)||(n.content||'').toLowerCase().includes(search)); }
-  if(tagFilter.length){ items=items.filter(n=> tagFilter.every(t => (n.tags||[]).includes(t))); }
-  if(minLinks>0){ items=items.filter(n=> (deg[n.id]||0) >= minLinks); }
-  items.sort((a,b)=> (newestFirst?1:-1)*(new Date(b.updated_at||b.created_at)-new Date(a.updated_at||a.created_at)));
-
-  const grid=$('#lib-grid');
-  grid.style.gridTemplateColumns=`repeat(auto-fill, minmax(${size}px, 1fr))`;
-  grid.innerHTML=items.map(n=>`
-    <article class="card" data-id="${n.id}">
-      <div class="title">${escapeHTML(n.title||'(untitled)')}</div>
-      <div class="preview">${escapeHTML((n.content||'').slice(0,140))}${(n.content||'').length>140?'…':''}</div>
-      <div class="meta"><span class="badge">#${(n.tags||[]).length} tags</span><span class="badge">${(deg[n.id]||0)} links</span></div>
-    </article>`).join('') || '<div class="muted">No results.</div>';
-
-  $$('#lib-grid .card').forEach(c=> c.addEventListener('click',()=>{ const id=c.getAttribute('data-id'); state.focusId=id; save(); location.hash='#/notecard'; loadNote(id); renderLeftList(); }));
+  const size=+$('#lib-size').value, search=$('#lib-search').value.toLowerCase(), tags=tagsOf($('#lib-tag-filter').value);
+  const {edges}=wlBuild(); const deg=wlDeg(edges);
+  let items=st.notes.slice();
+  if(st.projFilter){const set=new Set(projectsMap()[st.projFilter]||[]);items=items.filter(n=>set.has(n.id));}
+  if(search) items=items.filter(n=>(n.title||'').toLowerCase().includes(search)||(n.content||'').toLowerCase().includes(search));
+  if(tags.length) items=items.filter(n=>tags.every(t=>(n.tags||[]).includes(t)));
+  const min=+$('#lib-min-links').value; if(min>0) items=items.filter(n=>(deg[n.id]||0)>=min);
+  const newest=$('#lib-sort').checked; items.sort((a,b)=>(newest?1:-1)*(new Date(b.updated_at||b.created_at)-new Date(a.updated_at||a.created_at)));
+  const grid=$('#lib-grid'); grid.style.gridTemplateColumns=`repeat(auto-fill,minmax(${size}px,1fr))`;
+  grid.innerHTML=items.map(n=>`<article class="card" data-id="${n.id}"><div class="title">${esc(n.title||'(untitled)')}</div><div class="preview">${esc((n.content||'').slice(0,140))}${(n.content||'').length>140?'…':''}</div><div class="meta"><span class="badge">#${(n.tags||[]).length} tags</span><span class="badge">${(deg[n.id]||0)} links</span></div></article>`).join('')||'<div class="muted">No results.</div>';
+  $$('#lib-grid .card').forEach(c=>c.onclick=()=>{const id=c.getAttribute('data-id');st.focusId=id;persist();location.hash='#/notecard';load(id);renderLeft();});
 }
-$('#lib-size').addEventListener('input', renderLibrary);
-$('#lib-search').addEventListener('input', renderLibrary);
-$('#lib-tag-filter').addEventListener('input', renderLibrary);
-$('#lib-min-links').addEventListener('input', e=>{ $('#lib-min-links-val').textContent=e.target.value; renderLibrary(); });
-$('#lib-sort').addEventListener('change', renderLibrary);
-$('#lib-clear').addEventListener('click',()=>{
-  state.libProjectFilter=null;
-  $('#lib-active-project').style.display='none';
-  $('#lib-search').value=''; $('#lib-tag-filter').value='';
-  $('#lib-min-links').value='0'; $('#lib-min-links-val').textContent='0';
-  save(); renderProjectsBar(); renderLibrary();
-});
-$('#lib-active-project').addEventListener('click', ()=>{ state.libProjectFilter=null; save(); renderProjectsBar(); renderLibrary(); });
+$('#lib-size').oninput=renderLibrary; $('#lib-search').oninput=renderLibrary; $('#lib-tag-filter').oninput=renderLibrary;
+$('#lib-min-links').oninput=e=>{$('#lib-min-links-val').textContent=e.target.value; renderLibrary();};
+$('#lib-sort').onchange=renderLibrary;
+$('#lib-clear').onclick=()=>{st.projFilter=null;$('#lib-active-project').style.display='none';$('#lib-search').value='';$('#lib-tag-filter').value='';$('#lib-min-links').value='0';$('#lib-min-links-val').textContent='0';persist();renderProjectsBar();renderLibrary();};
+$('#lib-active-project').onclick=()=>{$('#lib-clear').click();};
 
-/* ===== Graph (built-in COSE with strong spacing) ===== */
-let cy=null;
-function coseLayout(){
-  return {
-    name: 'cose',
-    animate: 'end',
-    animationDuration: 400,
-    nodeRepulsion: 8000,
-    nodeOverlap: 20,
-    idealEdgeLength: 120,
-    edgeElasticity: 0.1,
-    gravity: 80,
-    numIter: 1000,
-    padding: 30,
-    componentSpacing: 120,
-    coolingFactor: 0.95,
-    minTemp: 1.0
-  };
-}
+/* ---------- Graph (COSE layout, stronger spacing) ---------- */
+function coseLayout(){return {name:'cose',animate:'end',animationDuration:400,nodeRepulsion:8000,nodeOverlap:20,idealEdgeLength:120,edgeElasticity:0.1,gravity:80,numIter:1000,padding:30,componentSpacing:120,coolingFactor:0.95,minTemp:1}}
 function renderGraph(){
-  $('#gr-breadth-val').textContent=$('#gr-breadth').value;
-  $('#gr-depth-val').textContent=$('#gr-depth').value;
-  const {edges}=buildGraph(); const deg=degreeMap(edges);
-  const breadth=+$('#gr-breadth').value; const focus=state.focusId; const depth=+$('#gr-depth').value;
-
-  let allowed=new Set(state.notes.map(n=>n.id));
-  if(focus){
-    const neigh=neighborsMap(edges);
-    allowed=new Set([focus]); let frontier=new Set([focus]);
-    for(let d=0; d<depth; d++){ const nxt=new Set(); frontier.forEach(v=> (neigh[v]||new Set()).forEach(u=>nxt.add(u))); nxt.forEach(v=>allowed.add(v)); frontier=nxt; }
-  }
-  const nodes=state.notes.filter(n=> allowed.has(n.id) && (deg[n.id]||0)>=breadth);
-  const els=[];
-  nodes.forEach(n=> els.push({data:{id:n.id,label:n.title||'(untitled)',degree:deg[n.id]||0}}));
-  edges.forEach(e=>{ if(nodes.find(x=>x.id===e.from)&&nodes.find(x=>x.id===e.to)) els.push({data:{id:e.from+'_'+e.to,source:e.from,target:e.to}}); });
-
-  const container=$('#cy');
-  if(!cy){
-    cy=cytoscape({
-      container, elements:els,
-      style:[
-        {selector:'node', style:{'label':'data(label)','text-wrap':'wrap','text-max-width':160,'font-size':10,'background-color':'#0ea5e9','color':'#0f172a','width':'mapData(degree,0,12,20,60)','height':'mapData(degree,0,12,20,60)','border-width':2,'border-color':'#0f172a'}},
-        {selector:'edge', style:{'width':2,'line-color':'#cbd5e1','target-arrow-shape':'triangle','target-arrow-color':'#cbd5e1','curve-style':'bezier'}},
-        {selector:':selected', style:{'border-color':'#111827','border-width':4}}
-      ],
-      layout: coseLayout()
-    });
-    cy.on('tap','node',evt=>{ state.focusId=evt.target.id(); save(); renderCluster(); $('#cluster-pane').scrollIntoView({behavior:'smooth',block:'center'}); });
-  } else {
-    cy.json({elements:els}); cy.layout(coseLayout()).run();
-  }
+  $('#gr-breadth-val').textContent=$('#gr-breadth').value; $('#gr-depth-val').textContent=$('#gr-depth').value;
+  const {edges}=wlBuild(); const deg=wlDeg(edges), breadth=+$('#gr-breadth').value, focus=st.focusId, depth=+$('#gr-depth').value;
+  let allowed=new Set(st.notes.map(n=>n.id));
+  if(focus){const N=wlNeigh(edges);allowed=new Set([focus]);let F=new Set([focus]);for(let d=0;d<depth;d++){const nx=new Set();F.forEach(v=>(N[v]||new Set()).forEach(u=>nx.add(u)));nx.forEach(v=>allowed.add(v));F=nx;}}
+  const nodes=st.notes.filter(n=>allowed.has(n.id)&&(deg[n.id]||0)>=breadth);
+  const els=[]; nodes.forEach(n=>els.push({data:{id:n.id,label:n.title||'(untitled)',degree:deg[n.id]||0}}));
+  edges.forEach(e=>{if(nodes.find(x=>x.id===e.from)&&nodes.find(x=>x.id===e.to))els.push({data:{id:e.from+'_'+e.to,source:e.from,target:e.to}})});
+  if(!cy){cy=cytoscape({container:$('#cy'),elements:els,style:[
+      {selector:'node',style:{'label':'data(label)','text-wrap':'wrap','text-max-width':160,'font-size':10,'background-color':'#0ea5e9','color':'#0f172a','width':'mapData(degree,0,12,20,60)','height':'mapData(degree,0,12,20,60)','border-width':2,'border-color':'#0f172a'}},
+      {selector:'edge',style:{'width':2,'line-color':'#cbd5e1','target-arrow-shape':'triangle','target-arrow-color':'#cbd5e1','curve-style':'bezier'}},
+      {selector:':selected',style:{'border-color':'#111827','border-width':4}}
+    ], layout:coseLayout()});
+    cy.on('tap','node',ev=>{st.focusId=ev.target.id();persist();renderCluster();$('#cluster-pane').scrollIntoView({behavior:'smooth',block:'center'});});
+  } else {cy.json({elements:els}); cy.layout(coseLayout()).run();}
 }
-$('#gr-breadth').addEventListener('input', renderGraph);
-$('#gr-depth').addEventListener('input', renderGraph);
-$('#gr-reset-focus').addEventListener('click',()=>{ state.focusId=null; save(); renderGraph(); renderCluster(); });
+$('#gr-breadth').oninput=renderGraph; $('#gr-depth').oninput=renderGraph; $('#gr-reset-focus').onclick=()=>{st.focusId=null;persist();renderGraph();renderCluster();};
 
-/* ===== Card Cluster ===== */
+/* ---------- Card cluster ---------- */
 function renderCluster(){
-  const size=+$('#cl-size').value; const depth=+$('#cl-depth').value; const focus=state.focusId;
-  const focusNote=state.notes.find(n=>n.id===focus);
-  $('#cl-focus').innerHTML = focusNote
-    ? `<div style="font-weight:700">${escapeHTML(focusNote.title||'(untitled)')}</div>
-       <div class="mono" style="white-space:pre-wrap">${escapeHTML((focusNote.content||'').slice(0,220))}${(focusNote.content||'').length>220?'…':''}</div>
-       <div class="chips" style="margin-top:6px">${(focusNote.tags||[]).map(t=>`<span class="chip">#${escapeHTML(t)}</span>`).join('')}</div>`
-    : '<div class="muted">No focus selected. Click a node in the graph above.</div>';
-
-  const {edges}=buildGraph(); const neigh=neighborsMap(edges);
-  const canvas=$('#cl-canvas'); canvas.innerHTML=''; $('#cl-links').textContent='';
-  if(!focusNote) return;
-
-  const seen=new Set([focus]); let frontier=new Set([focus]); const levels={[focus]:0};
-  for(let d=0; d<depth; d++){ const nxt=new Set(); frontier.forEach(v=> (neigh[v]||new Set()).forEach(u=>{ if(!seen.has(u)){ seen.add(u); nxt.add(u); levels[u]=d+1; } })); frontier=nxt; }
-  seen.delete(focus);
-  $('#cl-links').textContent=Array.from(seen).map(id=>{ const n=state.notes.find(x=>x.id===id); return `• (${levels[id]}) ${n?.title||id}`; }).join('\n');
-
-  Array.from(seen).forEach(id=>{ const n=state.notes.find(x=>x.id===id); if(!n) return; const card=document.createElement('article'); card.className='note-card'; card.style.width=size+'px'; card.innerHTML=`
-      <div style="font-weight:700">${escapeHTML(n.title||'(untitled)')}</div>
-      <div class="mono" style="white-space:pre-wrap">${escapeHTML((n.content||'').slice(0,160))}${(n.content||'').length>160?'…':''}</div>
-      <div class="chips" style="margin-top:6px">${(n.tags||[]).map(t=>`<span class="chip">#${escapeHTML(t)}</span>`).join('')}</div>
-      <div class="row" style="margin-top:6px">
-        <button class="btn" data-open="${n.id}">Open</button>
-        <button class="btn" data-link="${n.title}">[[Link]]</button>
-      </div>`; canvas.appendChild(card); });
-  $$('[data-open]').forEach(b=> b.addEventListener('click',()=>{ const id=b.getAttribute('data-open'); location.hash='#/notecard'; loadNote(id); renderLeftList(); }));
-  $$('[data-link]').forEach(b=> b.addEventListener('click',()=>{ const title=b.getAttribute('data-link'); location.hash='#/notecard'; const ta=$('#nc-content'); const text=`[[${title}]]`; const start=ta.selectionStart||ta.value.length; ta.value=ta.value.slice(0,start)+text+ta.value.slice(start); ta.selectionStart=ta.selectionEnd=start+text.length; ta.focus(); }));
+  const size=+$('#cl-size').value, depth=+$('#cl-depth').value, focus=st.focusId; const focusNote=st.notes.find(n=>n.id===focus);
+  $('#cl-focus').innerHTML=focusNote?`<div style="font-weight:700">${esc(focusNote.title||'(untitled)')}</div><div class="mono" style="white-space:pre-wrap">${esc((focusNote.content||'').slice(0,220))}${(focusNote.content||'').length>220?'…':''}</div><div class="chips" style="margin-top:6px">${(focusNote.tags||[]).map(t=>`<span class="chip">#${esc(t)}</span>`).join('')}</div>`:'<div class="muted">No focus selected.</div>';
+  const {edges}=wlBuild(); const N=wlNeigh(edges); const canvas=$('#cl-canvas'); canvas.innerHTML=''; $('#cl-links').textContent='';
+  if(!focusNote)return; const seen=new Set([focus]); let F=new Set([focus]); const lvl={[focus]:0}; for(let d=0;d<depth;d++){const nx=new Set();F.forEach(v=>(N[v]||new Set()).forEach(u=>{if(!seen.has(u)){seen.add(u);nx.add(u);lvl[u]=d+1}}));F=nx;}
+  seen.delete(focus); $('#cl-links').textContent=Array.from(seen).map(id=>`• (${lvl[id]}) ${st.notes.find(x=>x.id===id)?.title||id}`).join('\n');
+  Array.from(seen).forEach(id=>{const n=st.notes.find(x=>x.id===id);if(!n)return;const card=document.createElement('article');card.className='note-card';card.style.width=size+'px';card.innerHTML=`<div style="font-weight:700">${esc(n.title||'(untitled)')}</div><div class="mono" style="white-space:pre-wrap">${esc((n.content||'').slice(0,160))}${(n.content||'').length>160?'…':''}</div><div class="chips" style="margin-top:6px">${(n.tags||[]).map(t=>`<span class="chip">#${esc(t)}</span>`).join('')}</div><div class="row" style="margin-top:6px"><button class="btn" data-open="${n.id}">Open</button><button class="btn" data-link="${n.title}">[[Link]]</button></div>`; canvas.appendChild(card);});
+  $$('[data-open]').forEach(b=>b.onclick=()=>{const id=b.getAttribute('data-open');location.hash='#/notecard';load(id);renderLeft();});
+  $$('[data-link]').forEach(b=>b.onclick=()=>{const title=b.getAttribute('data-link');location.hash='#/notecard';const ta=$('#nc-content');const txt=`[[${title}]]`;const p=ta.selectionStart||ta.value.length;ta.value=ta.value.slice(0,p)+txt+ta.value.slice(p);ta.selectionStart=ta.selectionEnd=p+txt.length;ta.focus();});
 }
-$('#cl-size').addEventListener('input', renderCluster);
-$('#cl-depth').addEventListener('input', renderCluster);
+$('#cl-size').oninput=renderCluster; $('#cl-depth').oninput=renderCluster;
 
-/* ===== Export / Import (JSON) ===== */
-$('#btn-export').addEventListener('click',()=>{ const data=JSON.stringify({notes:state.notes},null,2); const url=URL.createObjectURL(new Blob([data],{type:'application/json'})); const a=document.createElement('a'); a.href=url; a.download='willow_export.json'; a.click(); setTimeout(()=>URL.revokeObjectURL(url),500); });
-$('#file-import').addEventListener('change',async e=>{ const f=e.target.files[0]; if(!f) return; try{ const text=await f.text(); const data=JSON.parse(text); if(Array.isArray(data)) { state.notes=data; } else if(Array.isArray(data.notes)) { state.notes=data.notes; } else { throw new Error('Invalid JSON structure'); } save(); alert('Imported.'); renderLeftList(); renderProjectsBar(); renderLibrary(); renderGraph(); renderCluster(); } catch{ alert('Invalid JSON.'); } });
+/* ---------- Import/Export ---------- */
+$('#btn-export').onclick=()=>{const data=JSON.stringify({notes:st.notes},null,2);const url=URL.createObjectURL(new Blob([data],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download='willow_export.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),500);};
+$('#file-import').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const text=await f.text();const data=JSON.parse(text);st.notes=Array.isArray(data)?data:(Array.isArray(data.notes)?data.notes:[]);persist();alert('Imported.');renderLeft();renderProjectsBar();renderLibrary();renderGraph();renderCluster();}catch{alert('Invalid JSON.');}};
 
-/* ===== Small starter if empty (safe to remove) ===== */
-if (state.notes.length === 0){
-  const A = {id:uid(), title:'Bank Funding Stress', content:'Deposits → MMFs. [[CRE Exposures]] [[Regional Banks]]', tags:['banking','risk','project:Atlas'], created_at:nowISO(), updated_at:nowISO(), debate:[]};
-  const B = {id:uid(), title:'CRE Exposures', content:'Office vacancy high; maturities in 26–27. [[Policy Path]]', tags:['cre','risk','project:Borealis'], created_at:nowISO(), updated_at:nowISO(), debate:[]};
-  const C = {id:uid(), title:'Policy Path', content:'Higher-for-longer; term premium.', tags:['policy','macro','project:Cascade'], created_at:nowISO(), updated_at:nowISO(), debate:[]};
-  const D = {id:uid(), title:'Regional Banks', content:'Unrealized losses + deposit flight. [[Bank Funding Stress]]', tags:['banking','project:Drift'], created_at:nowISO(), updated_at:nowISO(), debate:[]};
-  state.notes.push(A,B,C,D); save();
+/* ---------- Boot demo if empty ---------- */
+if(st.notes.length===0){const A={id:uid(),title:'Bank Funding Stress',content:'Deposits → MMFs. [[CRE Exposures]] [[Regional Banks]]',tags:['banking','risk','project:Atlas'],created_at:now(),updated_at:now(),debate:[]};
+  const B={id:uid(),title:'CRE Exposures',content:'Office vacancy high; maturities in 26–27. [[Policy Path]]',tags:['cre','risk','project:Borealis'],created_at:now(),updated_at:now(),debate:[]};
+  const C={id:uid(),title:'Policy Path',content:'Higher-for-longer; term premium.',tags:['policy','macro','project:Cascade'],created_at:now(),updated_at:now(),debate:[]};
+  const D={id:uid(),title:'Regional Banks',content:'Unrealized losses + deposit flight. [[Bank Funding Stress]]',tags:['banking','project:Drift'],created_at:now(),updated_at:now(),debate:[]};
+  st.notes.push(A,B,C,D); persist();
 }
-
-/* initial renders */
-renderLeftList(); renderTagChips();
+renderLeft();
 </script>
 </body>
 </html>
