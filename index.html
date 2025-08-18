@@ -5,10 +5,8 @@
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <title>Willow — Notecard • Library • Physics Graph (Demo)</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64'%3E%3Ctext y='50' font-size='48'%3E%F0%9F%8C%B2%3C/text%3E%3C/svg%3E">
-
-<!-- d3 for physics -->
+<!-- d3 for physics + zoom -->
 <script src="https://unpkg.com/d3@7.9.0/dist/d3.min.js"></script>
-
 <style>
   :root{--ink:#222;--muted:#6b7280;--line:#e5e7eb;--bg:#f8fafc;--chip:#f3f4f6;--panel:#fff;--btn:#f9fafb}
   *{box-sizing:border-box} html,body{height:100%} html{scroll-behavior:smooth}
@@ -43,7 +41,7 @@
   .card .title{font-weight:700;font-size:13px;margin-bottom:6px}.card .preview{color:#6b7280;font-size:12px;flex:1}
   .card .meta{display:flex;gap:8px;color:#6b7280;font-size:11px;margin-top:6px}
   #gwrap{position:relative}
-  #gcanvas{width:100%;height:520px;border:1px solid var(--line);border-radius:12px;background:#fff;display:block}
+  #gcanvas{width:100%;height:520px;border:1px solid var(--line);border-radius:12px;background:#fff;display:block;touch-action:none}
   .gctrls{display:flex;gap:14px;align-items:center;margin-bottom:10px;flex-wrap:wrap}
   .badge{border:1px solid var(--line);padding:2px 6px;border-radius:999px;font-size:11px;background:#f9fafb}
   .footer{text-align:center;color:#9ca3af;font-size:12px;margin-top:12px}
@@ -129,11 +127,11 @@
     <div class="pane">
       <h3 style="margin:0 0 8px">GRAPH (Physics)</h3>
       <div class="gctrls">
-        <span class="muted">Breadth (min degree)</span>
+        <span class="muted">Breadth</span>
         <input id="gr-breadth" type="range" min="0" max="10" step="1" value="0">
         <span id="gr-breadth-val" class="badge">0</span>
 
-        <span class="muted">Depth (hops from focus)</span>
+        <span class="muted">Depth</span>
         <input id="gr-depth" type="range" min="1" max="6" step="1" value="6">
         <span id="gr-depth-val" class="badge">6</span>
 
@@ -145,19 +143,24 @@
         <input id="gr-pad" type="range" min="0" max="20" step="1" value="6">
         <span id="gr-pad-val" class="badge">6</span>
 
-        <span class="muted">Link spring</span>
-        <input id="gr-link" type="range" min="30" max="200" step="5" value="110">
+        <span class="muted">Link base</span>
+        <input id="gr-link" type="range" min="30" max="220" step="5" value="110">
         <span id="gr-link-val" class="badge">110</span>
+
+        <span class="muted">Similarity weight</span>
+        <input id="gr-simw" type="range" min="0" max="2" step="0.1" value="1">
+        <span id="gr-simw-val" class="badge">1.0</span>
 
         <button id="gr-reset-focus" class="btn">Clear focus</button>
         <button id="gr-pause" class="btn">Pause</button>
         <button id="gr-reheat" class="btn">Reheat</button>
+        <button id="gr-resetview" class="btn">Reset View</button>
       </div>
       <div id="gwrap">
         <canvas id="gcanvas" width="1000" height="520"></canvas>
         <div id="gtooltip" class="tooltip"></div>
       </div>
-      <div class="muted" style="margin-top:8px">Tip: click a node to select (focus) and populate the Card Cluster below.</div>
+      <div class="muted" style="margin-top:8px">Zoom: wheel / pinch • Pan: drag empty space • Drag a node to move it • Click node to focus.</div>
     </div>
 
     <div class="pane" id="cluster-pane" style="margin-top:16px">
@@ -212,10 +215,8 @@ function show(h){h=h||location.hash||'#/notecard';
   if(h==='#/library'){renderProjectsBar();renderLibrary();}
   if(h==='#/graph'){initPhysics(); renderCluster();}
 }
-addEventListener('hashchange', ()=>show());
-// Delay first render until after *all* const/let declarations exist
-window.addEventListener('load', () => show());
-
+addEventListener('hashchange',()=>show());
+window.addEventListener('load', () => show()); // ensure all const/lets exist before first render
 
 /* ---------- Notecard ---------- */
 let leftMode='notes', currentId=null;
@@ -322,21 +323,54 @@ $('#lib-sort').onchange=renderLibrary;
 $('#lib-clear').onclick=()=>{st.projFilter=null;$('#lib-active-project').style.display='none';$('#lib-search').value='';$('#lib-tag-filter').value='';$('#lib-min-links').value='0';$('#lib-min-links-val').textContent='0';persist();renderProjectsBar();renderLibrary();};
 $('#lib-active-project').onclick=()=>{$('#lib-clear').click();};
 
-/* ===================== Physics Graph (d3-force) ===================== */
+/* ===================== Physics Graph (d3-force with zoom/pan + tag similarity) ===================== */
 let sim=null, nodes=[], links=[];
-const g = { // controls
-  G: 60, pad: 6, linkDist: 110, paused:false
-};
+const g = { G: 60, pad: 6, linkBase: 110, simW: 1.0, paused:false };
+
+// Canvas + transform for zoom/pan
 const canvas = $('#gcanvas'), ctx = canvas.getContext('2d');
+let transform = {k:1, x:0, y:0}; // screen = world*k + [x,y]
 const tooltip = $('#gtooltip');
 
 function resizeCanvas(){
   const rect = canvas.getBoundingClientRect();
-  canvas.width = rect.width * (window.devicePixelRatio||1);
-  canvas.height = rect.height * (window.devicePixelRatio||1);
-  ctx.setTransform(window.devicePixelRatio||1,0,0,window.devicePixelRatio||1,0,0);
+  const dpr = window.devicePixelRatio||1;
+  canvas.width = Math.max(2, Math.floor(rect.width * dpr));
+  canvas.height = Math.max(2, Math.floor(rect.height * dpr));
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  draw(); // redraw with current transform
 }
 window.addEventListener('resize', ()=>{ resizeCanvas(); if(sim) sim.alpha(0.3).restart(); });
+
+function toScreen(p){ return { x: p.x*transform.k + transform.x, y: p.y*transform.k + transform.y }; }
+function toWorld(px,py){ return { x: (px - transform.x)/transform.k, y: (py - transform.y)/transform.k }; }
+
+// d3-zoom on the canvas element
+const zoom = d3.zoom()
+  .scaleExtent([0.2, 6])
+  .on('zoom', (ev)=>{
+    transform = {k: ev.transform.k, x: ev.transform.x, y: ev.transform.y};
+    draw();
+  });
+d3.select(canvas).call(zoom);
+
+// Reset view
+$('#gr-resetview').onclick = ()=>{
+  transform = {k:1, x: canvas.width/(window.devicePixelRatio||1)/2, y: canvas.height/(window.devicePixelRatio||1)/2};
+  // set zoom transform so wheel continues from here
+  const t = d3.zoomIdentity.translate(transform.x, transform.y).scale(transform.k);
+  d3.select(canvas).call(zoom.transform, t);
+};
+
+// compute similarity between two notes (Jaccard on tags)
+function simTags(tagsA, tagsB){
+  const A = new Set((tagsA||[]).map(s=>s.toLowerCase()));
+  const B = new Set((tagsB||[]).map(s=>s.toLowerCase()));
+  if(A.size===0 && B.size===0) return 0;
+  let inter=0; A.forEach(t=>{ if(B.has(t)) inter++; });
+  const uni = A.size + B.size - inter;
+  return inter / uni; // 0..1
+}
 
 function dataForPhysics(){
   const {edges}=buildGraph(); const deg=degreeMap(edges);
@@ -352,109 +386,79 @@ function dataForPhysics(){
   const nodeList = st.notes.filter(n=> allowed.has(n.id) && (deg[n.id]||0)>=breadth)
     .map(n=>{
       const k = deg[n.id]||0;
-      const mass = 1 + Math.sqrt(k);     // heavier if more connections
-      const r = 10 + k*2;                 // visual radius
-      return { id:n.id, title:n.title||'(untitled)', degree:k, mass, r, tags:n.tags||[] };
+      const mass = 1 + Math.sqrt(k);
+      const r = 10 + k*2;
+      return { id:n.id, title:n.title||'(untitled)', degree:k, mass, r, tags:n.tags||[], x: (Math.random()-0.5)*200, y: (Math.random()-0.5)*200 };
     });
 
-  const ids = new Set(nodeList.map(n=>n.id));
-  const linkList = edges.filter(e=> ids.has(e.source) && ids.has(e.target))
-    .map(e=>({source:e.source,target:e.target, w:1}));
+  const idToNode = new Map(nodeList.map(n=>[n.id,n]));
+  const linkList = edges
+    .filter(e=> idToNode.has(e.source) && idToNode.has(e.target))
+    .map(e=>{
+      const a = idToNode.get(e.source), b = idToNode.get(e.target);
+      const s = simTags(a.tags, b.tags);
+      return {source:a, target:b, sim:s};
+    });
 
   return {nodeList, linkList};
 }
 
 function draw(){
+  const w = canvas.width/(window.devicePixelRatio||1), h = canvas.height/(window.devicePixelRatio||1);
   ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  ctx.save();
+  // apply zoom/pan
+  ctx.translate(transform.x, transform.y);
+  ctx.scale(transform.k, transform.k);
+
   // Edges
-  ctx.lineWidth = 1.5; ctx.strokeStyle = '#cbd5e1';
+  ctx.lineWidth = 1.5/transform.k; ctx.strokeStyle = '#cbd5e1';
   links.forEach(l=>{ ctx.beginPath(); ctx.moveTo(l.source.x, l.source.y); ctx.lineTo(l.target.x, l.target.y); ctx.stroke(); });
 
   // Nodes
   nodes.forEach(n=>{
-    // node circle
     ctx.beginPath();
     ctx.fillStyle = '#0ea5e9';
     ctx.strokeStyle = '#0f172a';
-    ctx.lineWidth = 2;
+    ctx.lineWidth = 2/transform.k;
     ctx.arc(n.x, n.y, n.r, 0, Math.PI*2);
     ctx.fill(); ctx.stroke();
-    // label
+
+    // label above node (unscaled font size; scale inversely so visuals stay readable)
+    ctx.save();
+    ctx.scale(1/transform.k, 1/transform.k);
     ctx.fillStyle='#0f172a';
     ctx.font='10px system-ui, sans-serif';
-    const maxW = 160;
     const text = n.title.length>34 ? n.title.slice(0,34)+'…' : n.title;
-    ctx.fillText(text, n.x - Math.min(ctx.measureText(text).width/2, maxW/2), n.y - n.r - 6);
+    const labelX = (n.x*transform.k) - (ctx.measureText(text).width/2);
+    const labelY = (n.y*transform.k) - (n.r*transform.k + 6);
+    ctx.fillText(text, labelX, labelY);
+    ctx.restore();
   });
+
+  ctx.restore();
 }
 
-function initPhysics(){
-  // read controls
-  g.G = +$('#gr-G').value; $('#gr-G-val').textContent=g.G;
-  g.pad = +$('#gr-pad').value; $('#gr-pad-val').textContent=g.pad;
-  g.linkDist = +$('#gr-link').value; $('#gr-link-val').textContent=g.linkDist;
-
-  const {nodeList, linkList} = dataForPhysics();
-  nodes = nodeList;
-  links = linkList;
-
-  resizeCanvas();
-
-  if(sim) sim.stop();
-
-  // Link force (springs)
-  const fLink = d3.forceLink(links)
-    .id(d=>d.id)
-    .distance(d => g.linkDist + 4* ( (d.source.degree||0)+(d.target.degree||0) )/2 )
-    .strength(0.08);
-
-  // Gravity-like attraction (positive many-body) scaled by mass
-  const fAttract = d3.forceManyBody()
-    .strength(d => +g.G * d.mass)           // attraction ~ mass
-    .theta(0.9);
-
-  // Collision boundary per node (invisible padding)
-  const fCollide = d3.forceCollide().radius(d => d.r + g.pad).iterations(2);
-
-  // Mild repulsion to avoid collapsed clumps (small negative)
-  const fRepel = d3.forceManyBody().strength(d => -20 * (1 + 0.3*d.mass));
-
-  // Drag to slow the system
-  const velocityDecay = 0.3;
-
-  sim = d3.forceSimulation(nodes)
-    .force('link', fLink)
-    .force('attract', fAttract)
-    .force('repel', fRepel)
-    .force('collide', fCollide)
-    .force('center', d3.forceCenter(canvas.width/2, canvas.height/2))
-    .velocityDecay(velocityDecay)
-    .alpha(0.9)
-    .on('tick', draw);
-
-  // Interaction (click select)
-  canvas.onmousemove = handleHover;
-  canvas.onclick = handleClick;
-
-  // Pause state
-  if(g.paused) sim.stop();
-  draw();
+let isDragging = false, dragNode = null;
+function pointerToWorld(ev){
+  const rect = canvas.getBoundingClientRect();
+  const px = ev.clientX - rect.left;
+  const py = ev.clientY - rect.top;
+  return toWorld(px, py);
 }
-
-function nodeAt(x,y){
-  // pick topmost node under pointer
+function nodeAtWorld(x,y){
   for(let i=nodes.length-1;i>=0;i--){
-    const n=nodes[i];
-    const dx=x-n.x, dy=y-n.y;
-    if(dx*dx+dy*dy <= (n.r+6)*(n.r+6)) return n; // include some tolerance
+    const n=nodes[i]; const dx=x-n.x, dy=y-n.y;
+    if(dx*dx+dy*dy <= (n.r+6)*(n.r+6)) return n;
   }
   return null;
 }
 function handleHover(ev){
   const rect = canvas.getBoundingClientRect();
-  const x = (ev.clientX - rect.left) * (canvas.width/rect.width);
-  const y = (ev.clientY - rect.top) * (canvas.height/rect.height);
-  const n = nodeAt(x,y);
+  const px = ev.clientX - rect.left, py = ev.clientY - rect.top;
+  const w = toWorld(px,py);
+  const n = nodeAtWorld(w.x,w.y);
   if(n){
     tooltip.style.opacity=1;
     tooltip.style.left = (ev.clientX+12)+'px';
@@ -463,29 +467,110 @@ function handleHover(ev){
     canvas.style.cursor='pointer';
   }else{
     tooltip.style.opacity=0;
-    canvas.style.cursor='default';
+    if(!isDragging) canvas.style.cursor='grab';
   }
 }
 function handleClick(ev){
-  const rect = canvas.getBoundingClientRect();
-  const x = (ev.clientX - rect.left) * (canvas.width/rect.width);
-  const y = (ev.clientY - rect.top) * (canvas.height/rect.height);
-  const n = nodeAt(x,y);
+  const w = pointerToWorld(ev);
+  const n = nodeAtWorld(w.x,w.y);
+  if(n){ st.focusId = n.id; persist(); renderCluster(); }
+}
+function handleDown(ev){
+  const w = pointerToWorld(ev);
+  const n = nodeAtWorld(w.x,w.y);
   if(n){
-    st.focusId = n.id; persist();
-    renderCluster();
+    dragNode = n; isDragging=true; canvas.style.cursor='grabbing';
+    n.fx = n.x; n.fy = n.y; // lock to start
+    if(sim) sim.alpha(0.4).restart();
+    ev.preventDefault();
   }
 }
+function handleMove(ev){
+  if(!isDragging || !dragNode) { handleHover(ev); return; }
+  const w = pointerToWorld(ev);
+  dragNode.fx = w.x; dragNode.fy = w.y;
+  draw();
+}
+function handleUp(){
+  if(dragNode){ dragNode.fx=null; dragNode.fy=null; }
+  dragNode=null; isDragging=false; canvas.style.cursor='grab';
+}
 
-// controls wiring
+canvas.addEventListener('mousemove', handleMove);
+canvas.addEventListener('mousedown', handleDown);
+canvas.addEventListener('mouseup', handleUp);
+canvas.addEventListener('mouseleave', handleUp);
+canvas.addEventListener('click', handleClick);
+
+// controls
 $('#gr-G').oninput = ()=>{ $('#gr-G-val').textContent=$('#gr-G').value; g.G=+$('#gr-G').value; if(sim){ sim.force('attract').strength(d=>+g.G*d.mass); sim.alpha(0.3).restart(); }};
 $('#gr-pad').oninput = ()=>{ $('#gr-pad-val').textContent=$('#gr-pad').value; g.pad=+$('#gr-pad').value; if(sim){ sim.force('collide').radius(d=>d.r+g.pad); sim.alpha(0.3).restart(); }};
-$('#gr-link').oninput = ()=>{ $('#gr-link-val').textContent=$('#gr-link').value; g.linkDist=+$('#gr-link').value; if(sim){ sim.force('link').distance(d=>g.linkDist + 4*((d.source.degree||0)+(d.target.degree||0))/2); sim.alpha(0.3).restart(); }};
+$('#gr-link').oninput = ()=>{ $('#gr-link-val').textContent=$('#gr-link').value; g.linkBase=+$('#gr-link').value; if(sim){ updateLinkForce(); sim.alpha(0.3).restart(); }};
+$('#gr-simw').oninput = ()=>{ $('#gr-simw-val').textContent=(+$('#gr-simw').value).toFixed(1); g.simW=+$('#gr-simw').value; if(sim){ updateLinkForce(); sim.alpha(0.3).restart(); }};
 $('#gr-breadth').oninput = ()=>{ initPhysics(); };
 $('#gr-depth').oninput = ()=>{ initPhysics(); };
 $('#gr-reset-focus').onclick = ()=>{ st.focusId=null; persist(); initPhysics(); renderCluster(); };
 $('#gr-pause').onclick = ()=>{ g.paused=!g.paused; if(g.paused){ sim.stop(); $('#gr-pause').textContent='Resume'; }else{ sim.alpha(0.4).restart(); $('#gr-pause').textContent='Pause'; }};
 $('#gr-reheat').onclick = ()=>{ if(sim){ sim.alpha(0.9).restart(); }};
+
+function updateLinkForce(){
+  if(!sim) return;
+  const fLink = sim.force('link');
+  fLink.distance(d=>{
+    // shorter when similar; never less than 40
+    // dist = base * (1 - 0.5*simW*sim)
+    const dist = Math.max(40, g.linkBase * (1 - 0.5 * g.simW * d.sim));
+    return dist;
+  });
+  fLink.strength(d=>{
+    // stronger when similar; cap to keep stable
+    // base 0.08 * (1 + 1.5*simW*sim)
+    const s = 0.08 * (1 + 1.5 * g.simW * d.sim);
+    return Math.min(1.5, s);
+  });
+}
+
+function initPhysics(){
+  // read controls
+  g.G = +$('#gr-G').value; $('#gr-G-val').textContent=g.G;
+  g.pad = +$('#gr-pad').value; $('#gr-pad-val').textContent=g.pad;
+  g.linkBase = +$('#gr-link').value; $('#gr-link-val').textContent=g.linkBase;
+  g.simW = +$('#gr-simw').value; $('#gr-simw-val').textContent=g.simW.toFixed(1);
+
+  const {nodeList, linkList} = dataForPhysics();
+  nodes = nodeList; links = linkList;
+
+  resizeCanvas();
+  transform = {k:1, x: canvas.width/(window.devicePixelRatio||1)/2, y: canvas.height/(window.devicePixelRatio||1)/2};
+  d3.select(canvas).call(zoom.transform, d3.zoomIdentity.translate(transform.x, transform.y).scale(transform.k));
+
+  if(sim) sim.stop();
+
+  const fLink = d3.forceLink(links).id(d=>d.id);
+  // distance/strength configured below
+  const fAttract = d3.forceManyBody().strength(d => +g.G * d.mass).theta(0.9);
+  const fCollide = d3.forceCollide().radius(d => d.r + g.pad).iterations(2);
+  const fRepel = d3.forceManyBody().strength(d => -20 * (1 + 0.3*d.mass));
+  const velocityDecay = 0.3;
+
+  sim = d3.forceSimulation(nodes)
+    .force('link', fLink)
+    .force('attract', fAttract)
+    .force('repel', fRepel)
+    .force('collide', fCollide)
+    .force('center', d3.forceCenter(0, 0)) // we pan/zoom visually; keep world centered
+    .velocityDecay(velocityDecay)
+    .alpha(0.9)
+    .on('tick', draw);
+
+  updateLinkForce();
+
+  // interaction cursors
+  canvas.style.cursor='grab';
+
+  if(g.paused) sim.stop();
+  draw();
+}
 
 /* ---------- Card Cluster (uses focusId) ---------- */
 function renderCluster(){
@@ -493,7 +578,7 @@ function renderCluster(){
   const {edges}=buildGraph(); const neigh=neighborsMap(edges);
   const focusNote=st.notes.find(n=>n.id===focus);
   $('#cl-focus').innerHTML=focusNote?`<div style="font-weight:700">${esc(focusNote.title||'(untitled)')}</div><div class="mono" style="white-space:pre-wrap">${esc((focusNote.content||'').slice(0,220))}${(focusNote.content||'').length>220?'…':''}</div><div class="chips" style="margin-top:6px">${(focusNote.tags||[]).map(t=>`<span class="chip">#${esc(t)}</span>`).join('')}</div>`:'<div class="muted">No focus selected.</div>';
-  const canvas=$('#cl-canvas'); canvas.innerHTML=''; $('#cl-links').textContent='';
+  const canvasEl=$('#cl-canvas'); canvasEl.innerHTML=''; $('#cl-links').textContent='';
   if(!focusNote) return;
 
   const seen=new Set([focus]); let frontier=new Set([focus]); const levels={[focus]:0};
@@ -508,7 +593,7 @@ function renderCluster(){
       <div class="row" style="margin-top:6px">
         <button class="btn" data-open="${n.id}">Open</button>
         <button class="btn" data-link="${n.title}">[[Link]]</button>
-      </div>`; canvas.appendChild(card); });
+      </div>`; canvasEl.appendChild(card); });
   $$('[data-open]').forEach(b=> b.onclick=()=>{ const id=b.getAttribute('data-open'); location.hash='#/notecard'; load(id); renderLeft(); });
   $$('[data-link]').forEach(b=> b.onclick=()=>{ const title=b.getAttribute('data-link'); location.hash='#/notecard'; const ta=$('#nc-content'); const txt=`[[${title}]]`; const p=ta.selectionStart||ta.value.length; ta.value=ta.value.slice(0,p)+txt+ta.value.slice(p); ta.selectionStart=ta.selectionEnd=p+txt.length; ta.focus(); });
 }
