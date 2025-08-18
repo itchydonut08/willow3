@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>Willow — Notecard • Library • Graph</title>
+<title>Willow — Notecard • Library • Graph (Demo)</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64'%3E%3Ctext y='50' font-size='48'%3E%F0%9F%8C%B2%3C/text%3E%3C/svg%3E">
 <script src="https://unpkg.com/cytoscape@3.30.3/dist/cytoscape.min.js"></script>
 <style>
@@ -20,7 +20,7 @@
   .pane{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px}
   .tabs{display:flex;gap:8px}.tab{padding:6px 10px;border:1px solid var(--line);border-radius:10px;background:#fff;cursor:pointer}
   .tab.active{background:#efefef}
-  .list{border-top:1px solid var(--line);margin-top:10px;max-height:70vh;overflow:auto;scroll-behavior:smooth}
+  .list{border-top:1px solid var(--line);margin-top:10px;max-height:70vh;overflow:auto}
   .item{padding:10px;border-bottom:1px dashed #e5e7eb;cursor:pointer}.item .t{font-weight:600}.muted{color:#6b7280}
   .row{display:flex;gap:10px;align-items:center}.row.space{justify-content:space-between}
   .btn{background:var(--btn);border:1px solid var(--line);border-radius:10px;padding:8px 12px;cursor:pointer}
@@ -81,6 +81,7 @@
       </div>
       <input id="nc-tags" type="text" placeholder="#Tags   comma or #prefix"/>
       <div id="tag-chips" class="chips" style="margin-top:6px"></div>
+
       <div class="row" style="margin-top:10px">
         <select id="debate-agent" style="width:auto">
           <option value="Historian">Historian</option>
@@ -145,9 +146,8 @@
 </main>
 
 <script>
-/* ---------- Config ---------- */
-const AGENT_API = 'https://YOUR_WORKER_SUBDOMAIN.workers.dev/agent'; // <-- set to your worker URL
-const PROMPTS_URL = 'prompts.json';
+/*** ===== Demo-only: your OpenAI API key (exposed) ===== ***/
+const OPENAI_KEY = "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";
 
 /* ---------- Helpers ---------- */
 const $=s=>document.querySelector(s), $$=s=>Array.from(document.querySelectorAll(s));
@@ -158,7 +158,7 @@ const oneSentence=s=>{s=(s||'').replace(/\s+/g,' ').trim();const i=s.indexOf('.'
 const tagsOf=s=>(s||'').split(',').map(x=>x.trim().replace(/^#/,'')).filter(Boolean);
 
 /* ---------- Global state ---------- */
-let cy=null; // ensure this exists before router calls renderGraph()
+let cy=null; // important: declared before router may call renderGraph()
 const st={ notes: JSON.parse(localStorage.getItem('wl_notes')||'[]'), focusId: localStorage.getItem('wl_focusId')||null, projFilter: localStorage.getItem('wl_proj')||null, prompts:{} };
 const persist=()=>{ localStorage.setItem('wl_notes', JSON.stringify(st.notes)); localStorage.setItem('wl_focusId', st.focusId||''); localStorage.setItem('wl_proj', st.projFilter||''); };
 
@@ -214,31 +214,49 @@ function renderSuggestions(){const host=$('#suggested');host.innerHTML='';const 
 }
 $('#btn-run-suggest').onclick=renderSuggestions;
 
-/* ---------- Agents (uses prompts.json + Cloudflare Worker) ---------- */
+/* ---------- Prompts: load from prompts.json, else use inline defaults ---------- */
+const defaultPrompts = {
+  "Historian": {"system":"You are a meticulous historian. Provide context and precedents.","user":"Note title: {title}\nNote text:\n{text}\nWrite 1–2 tight paragraphs with parallels and what to watch.","temperature":0.6,"model":"gpt-4o-mini"},
+  "Economist": {"system":"You are a pragmatic macroeconomist. Quantify where possible.","user":"Given the note “{title}”:\n{text}\nReturn bullets for mechanisms, data to check, and a base/alt scenario.","temperature":0.5,"model":"gpt-4o-mini"},
+  "Contrarian": {"system":"You challenge assumptions with evidence; be constructive.","user":"Critique key assumptions in “{title}”.\n{text}\nGive 3–5 counterpoints and 2 falsification tests.","temperature":0.7},
+  "BlindSpot": {"system":"Identify omissions and risks.","user":"For “{title}”, list blind spots, missing stakeholders, and unintended consequences.\n{text}\nReturn a short checklist.","temperature":0.5},
+  "Interconnectedness": {"system":"Map second- and third-order links across domains.","user":"Note “{title}”:\n{text}\nGive a compact map of 2nd/3rd-order effects and which prior notes to link to (just titles).","temperature":0.6}
+};
 async function loadPrompts(){
-  try{const res=await fetch(PROMPTS_URL,{cache:'no-store'}); st.prompts=await res.json();}
-  catch{st.prompts={};}
+  try{
+    const res = await fetch('prompts.json', {cache:'no-store'});
+    if(res.ok){ st.prompts = await res.json(); return; }
+  }catch(e){}
+  st.prompts = defaultPrompts;
 }
 loadPrompts();
 
+/* ---------- Ask AI (browser → OpenAI) ---------- */
+/* NOTE: This works only if your browser environment permits CORS to api.openai.com. */
 async function askAgent(){
   const agentKey=$('#debate-agent').value;
-  const P=st.prompts[agentKey]||{system:'You are a helpful expert.',user:'Note title: {title}\nNote text:\n{text}\nGive insights.'};
+  const P=st.prompts[agentKey]||defaultPrompts[agentKey]||defaultPrompts.Historian;
   const note=draft();
   const body={
-    system: P.system,
-    user: (P.user||'').replaceAll('{title}', note.title||'').replaceAll('{text}', note.content||''),
+    model: P.model || 'gpt-4o-mini',
     temperature: P.temperature ?? 0.7,
-    model: P.model || 'gpt-4o-mini'
+    messages: [
+      { role:'system', content: P.system || 'You are a helpful assistant.' },
+      { role:'user', content: (P.user||'').replaceAll('{title}', note.title||'').replaceAll('{text}', note.content||'') }
+    ]
   };
   $('#debate-output').textContent='Thinking…';
   try{
-    const r=await fetch(AGENT_API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-    if(!r.ok) throw new Error(await r.text());
+    const r=await fetch('https://api.openai.com/v1/chat/completions',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+OPENAI_KEY},
+      body:JSON.stringify(body)
+    });
+    if(!r.ok){ throw new Error(await r.text()); }
     const data=await r.json();
-    $('#debate-output').textContent=data.text || data.output || '(no text)';
+    $('#debate-output').textContent = data.choices?.[0]?.message?.content || '(no text)';
   }catch(err){
-    $('#debate-output').textContent='Agent error: '+err.message+'\nCheck AGENT_API URL and your worker.';
+    $('#debate-output').textContent='Agent error: '+err.message+'\n(If this is a CORS error, it won’t work from a static page without a proxy.)';
   }
 }
 $('#debate-ask').onclick=askAgent;
@@ -275,7 +293,7 @@ $('#lib-sort').onchange=renderLibrary;
 $('#lib-clear').onclick=()=>{st.projFilter=null;$('#lib-active-project').style.display='none';$('#lib-search').value='';$('#lib-tag-filter').value='';$('#lib-min-links').value='0';$('#lib-min-links-val').textContent='0';persist();renderProjectsBar();renderLibrary();};
 $('#lib-active-project').onclick=()=>{$('#lib-clear').click();};
 
-/* ---------- Graph (COSE layout, stronger spacing) ---------- */
+/* ---------- Graph (COSE layout with spacing) ---------- */
 function coseLayout(){return {name:'cose',animate:'end',animationDuration:400,nodeRepulsion:8000,nodeOverlap:20,idealEdgeLength:120,edgeElasticity:0.1,gravity:80,numIter:1000,padding:30,componentSpacing:120,coolingFactor:0.95,minTemp:1}}
 function renderGraph(){
   $('#gr-breadth-val').textContent=$('#gr-breadth').value; $('#gr-depth-val').textContent=$('#gr-depth').value;
