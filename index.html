@@ -1,385 +1,691 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Notetaker with [[link]] Suggestions</title>
-
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Willow — Notecard • Library • Physics Graph (Demo)</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64'%3E%3Ctext y='50' font-size='48'%3E%F0%9F%8C%B2%3C/text%3E%3C/svg%3E">
+<script src="https://unpkg.com/d3@7.9.0/dist/d3.min.js"></script>
 <style>
+  /* Light theme */
   :root{
-    --bg:#ffffff; --panel:#f5f7fb; --text:#0e1116; --muted:#4b5563; --border:#e5e7eb; --primary:#2563eb;
+    --ink:#111827;           /* text */
+    --muted:#6b7280;
+    --bg:#f8fafc;            /* app bg */
+    --panel:#ffffff;         /* cards/panels */
+    --line:#e5e7eb;          /* borders */
+    --chip:#f3f4f6;
+    --btn:#f9fafb;
+    --link:#0ea5e9;
+
+    /* Graph */
+    --g-edge:#cbd5e1;
+    --g-node:#0ea5e9;
+    --g-stroke:#0f172a;
+    --g-label:#0f172a;
   }
-  .dark{
-    --bg:#0b0f15; --panel:#121823; --text:#e6e9ef; --muted:#a3aab7; --border:#1f2633; --primary:#60a5fa;
+
+  /* Dark theme */
+  [data-theme="dark"]{
+    --ink:#e5e7eb;
+    --muted:#9ca3af;
+    --bg:#0b1020;
+    --panel:#0f172a;
+    --line:#1f2937;
+    --chip:#111827;
+    --btn:#111827;
+    --link:#38bdf8;
+
+    --g-edge:#334155;
+    --g-node:#22d3ee;
+    --g-stroke:#e5e7eb;
+    --g-label:#e5e7eb;
   }
+
+  *{box-sizing:border-box}
   html,body{height:100%}
-  body{
-    margin:0; background:var(--bg); color:var(--text);
-    font-family: system-ui, -apple-system, Segoe UI, Roboto, Inter, Arial, sans-serif;
-    transition: background .2s ease, color .2s ease;
-  }
-  .app{
-    max-width:1100px; margin:24px auto; padding:0 16px; display:grid; grid-template-columns: 340px 1fr; gap:16px;
-  }
-  .card{
-    background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:14px;
-  }
-  h1{margin:0 0 10px; font-size:20px}
-  label{display:block; font-size:12px; color:var(--muted); margin-bottom:6px}
-  input[type="text"]{
-    width:100%; padding:.6rem .75rem; border:1px solid var(--border); background:var(--bg); color:var(--text);
-    border-radius:10px; outline:none;
-  }
-  input[type="text"]:focus{border-color:var(--primary)}
-  textarea{
-    width:100%; min-height:330px; resize:vertical; padding:.75rem .85rem; border-radius:12px;
-    border:1px solid var(--border); background:var(--bg); color:var(--text); outline:none; line-height:1.4;
-    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  }
-  textarea:focus{border-color:var(--primary)}
-  .row{display:flex; gap:8px; align-items:center; flex-wrap:wrap}
-  .btn{
-    border:1px solid var(--border); background:var(--panel); color:var(--text); padding:.55rem .9rem;
-    border-radius:999px; cursor:pointer;
-  }
-  .btn:hover{border-color:var(--primary)}
-  .btn.primary{background:var(--primary); color:#fff; border-color:var(--primary)}
-  .muted{color:var(--muted); font-size:12px}
-  .list{display:flex; flex-direction:column; gap:8px; max-height:520px; overflow:auto}
-  .noteItem{
-    border:1px solid var(--border); border-radius:12px; padding:10px; background:var(--bg); cursor:pointer;
-  }
-  .noteItem:hover{border-color:var(--primary)}
-  .noteTitle{font-weight:600}
-  .noteMeta{font-size:11px; color:var(--muted)}
-  .tags{display:flex; gap:6px; flex-wrap:wrap; margin-top:6px}
-  .tag{
-    font-size:11px; padding:2px 6px; border-radius:999px; border:1px solid var(--border); color:var(--muted);
-  }
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,"Noto Sans",sans-serif}
 
-  /* Suggestions dropdown */
-  .suggestions{
-    position:absolute; display:none; background:var(--panel); border:1px solid var(--border);
-    border-radius:10px; box-shadow:0 8px 18px rgba(0,0,0,.18); max-height:220px; overflow:auto; z-index:1000;
-    min-width:280px;
-  }
-  .sug-item{
-    padding:.45rem .75rem; cursor:pointer; display:flex; justify-content:space-between; gap:12px;
-  }
-  .sug-item:hover, .sug-item.active{ background:var(--primary); color:#fff }
-  .sug-count{ font-size:12px; opacity:.8 }
-
-  /* Floating theme toggle */
-  #themeToggle{
-    position:fixed; right:12px; bottom:12px; z-index:2000;
-  }
+  header{padding:12px 20px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;background:var(--panel);position:sticky;top:0;z-index:5}
+  .title{display:flex;gap:10px;align-items:baseline}.title h1{margin:0;font-size:18px}
+  .nav{display:flex;gap:8px;align-items:center}
+  .nav a{padding:6px 10px;border:1px solid var(--line);border-radius:10px;background:var(--panel);text-decoration:none;color:inherit}
+  .nav a.active{background:var(--ink);color:var(--panel);border-color:var(--ink)}
+  .wrap{max-width:1200px;margin:0 auto;padding:16px}
+  .grid-3{display:grid;grid-template-columns:260px 1fr 300px;gap:16px}
+  .pane{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px}
+  .tabs{display:flex;gap:8px}.tab{padding:6px 10px;border:1px solid var(--line);border-radius:10px;background:var(--panel);cursor:pointer;color:var(--ink)}
+  .tab.active{background:var(--chip)}
+  .list{border-top:1px solid var(--line);margin-top:10px;max-height:70vh;overflow:auto}
+  .item{padding:10px;border-bottom:1px dashed var(--line);cursor:pointer}.item .t{font-weight:600}.muted{color:var(--muted)}
+  .row{display:flex;gap:10px;align-items:center}.row.space{justify-content:space-between}
+  .btn{background:var(--btn);border:1px solid var(--line);border-radius:10px;padding:8px 12px;cursor:pointer;color:var(--ink)}
+  input[type="text"],textarea,select{width:100%;border:1px solid var(--line);border-radius:10px;padding:10px;background:var(--panel);color:var(--ink);font:inherit}
+  textarea{min-height:300px;resize:vertical}
+  .chips{display:flex;gap:6px;flex-wrap:wrap}.chip{background:var(--chip);border:1px solid var(--line);border-radius:999px;padding:4px 8px;font-size:12px;color:var(--ink)}
+  .sugg{border-top:1px solid var(--line);padding-top:8px;max-height:50vh;overflow:auto}
+  .sugg-item{padding:8px;border:1px dashed var(--line);border-radius:10px;margin-bottom:8px;cursor:pointer;color:var(--ink)}
+  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono",monospace;font-size:12px;color:var(--muted)}
+  .lib{display:block}
+  .projects-bar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+  .proj-card{display:flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:6px 10px;cursor:pointer;color:var(--ink)}
+  .proj-card .count{background:rgba(99,102,241,.15);border:1px solid rgba(99,102,241,.35);border-radius:999px;padding:2px 6px;font-size:11px;color:var(--ink)}
+  .lib-controls{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+  .lib-grid{display:grid;gap:12px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px;cursor:pointer;display:flex;flex-direction:column}
+  .card .title{font-weight:700;font-size:13px;margin-bottom:6px}.card .preview{color:var(--muted);font-size:12px;flex:1}
+  .card .meta{display:flex;gap:8px;color:var(--muted);font-size:11px;margin-top:6px}
+  #gwrap{position:relative}
+  #gcanvas{width:100%;height:520px;border:1px solid var(--line);border-radius:12px;background:var(--panel);display:block;touch-action:none}
+  .gctrls{display:flex;gap:14px;align-items:center;margin-bottom:10px;flex-wrap:wrap}
+  .badge{border:1px solid var(--line);padding:2px 6px;border-radius:999px;font-size:11px;background:var(--btn);color:var(--ink)}
+  .footer{text-align:center;color:var(--muted);font-size:12px;margin-top:12px}
+  .tooltip{position:absolute;pointer-events:none;background:var(--ink);color:var(--panel);padding:6px 8px;border-radius:8px;font-size:12px;opacity:0;transition:opacity .15s}
+  .linkish{color:var(--link)}
 </style>
 </head>
 <body>
-  <button id="themeToggle" class="btn" aria-label="Toggle theme">🌙</button>
-
-  <div class="app">
-    <!-- Sidebar: notes & popular links -->
-    <div class="card">
-      <h1>Notes</h1>
-      <div class="row" style="margin-bottom:8px">
-        <button id="newNote" class="btn">New</button>
-        <button id="deleteNote" class="btn">Delete</button>
-        <span class="muted">Click a note to load it.</span>
-      </div>
-      <div id="notesList" class="list" aria-label="Saved notes"></div>
-
-      <h1 style="margin-top:18px">Popular Links</h1>
-      <div id="popularLinks" class="tags"></div>
-    </div>
-
-    <!-- Editor -->
-    <div class="card" style="position:relative">
-      <h1>Editor</h1>
-      <label for="title">Title</label>
-      <input id="title" type="text" placeholder="Note title…" />
-      <div class="row" style="margin:10px 0 6px">
-        <div class="muted">Tip: type <strong>[[</strong> to link to other pages.</div>
-        <div style="flex:1"></div>
-        <button id="save" class="btn primary">Save</button>
-      </div>
-      <label for="content">Content</label>
-      <textarea id="content" placeholder="Write your note… Use [[Link Names]] to create or reference pages."></textarea>
-
-      <!-- Suggestions dropdown -->
-      <div id="suggestions" class="suggestions" role="listbox" aria-label="Link suggestions"></div>
-    </div>
+<header>
+  <div class="title">
+    <h1>Willow</h1><span class="muted">Notecard • Library • Physics Graph</span>
   </div>
+  <nav class="nav">
+    <a href="#/notecard" id="nav-notecard" class="active">Notecard</a>
+    <a href="#/library" id="nav-library">Library</a>
+    <a href="#/graph" id="nav-graph">Graph</a>
+    <span class="muted" style="margin-left:12px">•</span>
+    <button id="btn-export" class="btn">Export</button>
+    <label class="btn" style="cursor:pointer"><input id="file-import" type="file" accept="application/json" style="display:none"> Import</label>
+    <button id="btn-theme" class="btn" title="Toggle dark mode">🌓</button>
+  </nav>
+</header>
+
+<main class="wrap">
+  <!-- Notecard -->
+  <section id="view-notecard" class="grid-3">
+    <aside class="pane">
+      <div class="tabs"><button id="tab-notes" class="tab active">Notes</button><button id="tab-suggestions" class="tab">Suggestions</button></div>
+      <div id="left-list" class="list"></div>
+    </aside>
+    <section class="pane">
+      <input id="nc-title" type="text" placeholder="Title (new note)"/>
+      <textarea id="nc-content" placeholder="Text (new note)
+
+[[wikilinks]] supported."></textarea>
+      <div class="row space">
+        <div class="row">
+          <button id="btn-save-note" class="btn">Save</button>
+          <button id="btn-new-note" class="btn">New</button>
+        </div>
+        <label class="btn"><input id="file-attach" type="file" style="display:none"> FILE</label>
+      </div>
+      <input id="nc-tags" type="text" placeholder="#Tags   comma or #prefix"/>
+      <div id="tag-chips" class="chips" style="margin-top:6px"></div>
+
+      <div class="row" style="margin-top:10px">
+        <select id="debate-agent" style="width:auto">
+          <option value="Historian">Historian</option>
+          <option value="Economist">Economist</option>
+          <option value="Contrarian">Contrarian</option>
+          <option value="BlindSpot">Blind Spot</option>
+          <option value="Interconnectedness">Interconnectedness</option>
+        </select>
+        <button id="debate-ask" class="btn">Ask AI</button>
+        <button id="debate-add" class="btn">Add to note</button>
+      </div>
+      <pre id="debate-output" class="mono" style="white-space:pre-wrap"></pre>
+    </section>
+    <aside class="pane">
+      <div class="row space"><div class="muted">Suggested Links</div><button class="btn" id="btn-run-suggest">Run</button></div>
+      <div id="suggested" class="sugg"></div>
+    </aside>
+  </section>
+
+  <!-- Library -->
+  <section id="view-library" class="lib" style="display:none">
+    <div class="pane">
+      <h3 style="margin:0 0 8px">LIBRARY</h3>
+      <div id="projects-bar" class="projects-bar"></div>
+      <div class="lib-controls">
+        <input id="lib-search" type="text" placeholder="Search titles/content" style="flex:1;min-width:200px"/>
+        <input id="lib-tag-filter" type="text" placeholder="#tag1, #tag2" style="min-width:200px"/>
+        <span class="muted">Min linkages</span><input id="lib-min-links" type="range" min="0" max="10" step="1" value="0"><span id="lib-min-links-val" class="badge">0</span>
+        <span class="muted">Card size</span><input id="lib-size" type="range" min="160" max="320" step="10" value="220">
+        <label class="row"><span class="muted">Newest first</span><input id="lib-sort" type="checkbox" checked style="margin-left:6px"></label>
+        <span id="lib-active-project" class="chip" style="display:none;cursor:pointer" title="Click to clear">Project: —</span>
+        <button id="lib-clear" class="btn">Clear</button>
+      </div>
+      <div id="lib-grid" class="lib-grid"></div>
+    </div>
+  </section>
+
+  <!-- Physics Graph -->
+  <section id="view-graph" style="display:none">
+    <div class="pane">
+      <h3 style="margin:0 0 8px">GRAPH (Physics)</h3>
+      <div class="gctrls">
+        <span class="muted">Breadth</span>
+        <input id="gr-breadth" type="range" min="0" max="10" step="1" value="0">
+        <span id="gr-breadth-val" class="badge">0</span>
+
+        <span class="muted">Depth</span>
+        <input id="gr-depth" type="range" min="1" max="6" step="1" value="6">
+        <span id="gr-depth-val" class="badge">6</span>
+
+        <span class="muted">G (attraction)</span>
+        <input id="gr-G" type="range" min="0" max="200" step="5" value="60">
+        <span id="gr-G-val" class="badge">60</span>
+
+        <span class="muted">Collision +padding</span>
+        <input id="gr-pad" type="range" min="0" max="20" step="1" value="6">
+        <span id="gr-pad-val" class="badge">6</span>
+
+        <span class="muted">Link base</span>
+        <input id="gr-link" type="range" min="30" max="220" step="5" value="110">
+        <span id="gr-link-val" class="badge">110</span>
+
+        <span class="muted">Similarity weight</span>
+        <input id="gr-simw" type="range" min="0" max="2" step="0.1" value="1">
+        <span id="gr-simw-val" class="badge">1.0</span>
+
+        <button id="gr-reset-focus" class="btn">Clear focus</button>
+        <button id="gr-pause" class="btn">Pause</button>
+        <button id="gr-reheat" class="btn">Reheat</button>
+        <button id="gr-resetview" class="btn">Reset View</button>
+      </div>
+      <div id="gwrap">
+        <canvas id="gcanvas" width="1000" height="520"></canvas>
+        <div id="gtooltip" class="tooltip"></div>
+      </div>
+      <div class="muted" style="margin-top:8px">Zoom: wheel / pinch • Pan: drag empty space • Drag a node to move it • Click node to focus (center & filter by Depth).</div>
+    </div>
+
+    <div class="pane" id="cluster-pane" style="margin-top:16px">
+      <div class="row space">
+        <h3 style="margin:0">GRAPH: Card Cluster</h3>
+        <div class="row"><span class="muted">Card size</span><input id="cl-size" type="range" min="160" max="320" step="10" value="220"><span class="muted">Depth</span><input id="cl-depth" type="range" min="1" max="5" step="1" value="1"></div>
+      </div>
+      <div class="grid-3" style="grid-template-columns:220px 1fr;gap:16px">
+        <aside><div class="muted">Focus Note</div><div id="cl-focus" class="note-card"></div><div class="muted" style="margin:8px 0">Linked notes</div><div id="cl-links" class="mono" style="font-size:12px"></div></aside>
+        <section id="cl-canvas" style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-start"></section>
+      </div>
+    </div>
+  </section>
+
+  <div class="footer">Local-first. All data is in your browser (localStorage). © 2025</div>
+</main>
 
 <script>
-/* =======================
-   THEME (dark/light)
-======================= */
-(function initTheme(){
-  const root=document.documentElement;
-  const saved=localStorage.getItem('theme');
-  const prefersDark=window.matchMedia('(prefers-color-scheme: dark)').matches;
-  const theme=saved || (prefersDark?'dark':'light');
-  root.classList.toggle('dark', theme==='dark');
-  updateToggleIcon(theme);
-})();
-document.getElementById('themeToggle').addEventListener('click',()=>{
-  const root=document.documentElement;
-  const isDark=root.classList.toggle('dark');
-  localStorage.setItem('theme', isDark?'dark':'light');
-  updateToggleIcon(isDark?'dark':'light');
-});
-function updateToggleIcon(theme){
-  const btn=document.getElementById('themeToggle');
-  btn.textContent = theme==='dark' ? '🌞' : '🌙';
-  btn.title = theme==='dark' ? 'Switch to light mode' : 'Switch to dark mode';
+/*** ===== Demo-only: API key baked in (exposed) ===== ***/
+const OPENAI_KEY = "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";
+
+/* ---------- Theme (Dark/Light) ---------- */
+const THEME_KEY='willow_theme';
+const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+function applyTheme(t){
+  document.documentElement.setAttribute('data-theme', t);
+  // redraw graph to update canvas colors
+  if(typeof draw==='function') draw();
+}
+function initTheme(){
+  const saved = localStorage.getItem(THEME_KEY);
+  const t = saved || (prefersDark ? 'dark' : 'light');
+  applyTheme(t);
+}
+$('#btn-theme').onclick=()=>{ const curr=document.documentElement.getAttribute('data-theme'); const next=curr==='dark'?'light':'dark'; localStorage.setItem(THEME_KEY,next); applyTheme(next); };
+initTheme();
+
+/* ---------- Helpers ---------- */
+const $=s=>document.querySelector(s), $$=s=>Array.from(document.querySelectorAll(s));
+const esc=s=>(''+s).replace(/[&<>"']/g,m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]));
+const uid=()=>crypto.randomUUID?crypto.randomUUID():(Date.now()+Math.random()).toString(36);
+const now=()=>new Date().toISOString();
+const oneSentence=s=>{s=(s||'').replace(/\s+/g,' ').trim();const i=s.indexOf('.');return (i>40?s.slice(0,140)+'…':(i>0?s.slice(0,i+1):s.slice(0,140)))||'(no description)';};
+const tagsOf=s=>(s||'').split(',').map(x=>x.trim().replace(/^#/,'')).filter(Boolean);
+
+/* ---------- Global state ---------- */
+const st={ notes: JSON.parse(localStorage.getItem('wl_notes')||'[]'), focusId: localStorage.getItem('wl_focusId')||null, projFilter: localStorage.getItem('wl_proj')||null, prompts:{} };
+const persist=()=>{ localStorage.setItem('wl_notes', JSON.stringify(st.notes)); localStorage.setItem('wl_focusId', st.focusId||''); localStorage.setItem('wl_proj', st.projFilter||''); };
+
+/* ---------- Graph helpers (shared) ---------- */
+function extractLinks(text){const out=[];if(!text)return out;const re=/\[\[([^\]]+)\]\]/g;let m;while((m=re.exec(text))!==null)out.push(m[1].trim());return out;}
+function buildGraph(){
+  const titleToId={}; st.notes.forEach(n=>{ if(n.title) titleToId[n.title]=n.id; });
+  const edges=[]; st.notes.forEach(n=>{ extractLinks(n.content).forEach(t=>{ const to=titleToId[t]; if(to && to!==n.id) edges.push({source:n.id,target:to}); }); });
+  return {edges};
+}
+function degreeMap(edges){const d={}; edges.forEach(e=>{ d[e.source]=(d[e.source]||0)+1; d[e.target]=(d[e.target]||0)+1; }); return d; }
+function neighborsMap(edges){const map={}; edges.forEach(e=>{ (map[e.source]=map[e.source]||new Set()).add(e.target); (map[e.target]=map[e.target]||new Set()).add(e.source); }); return map; }
+
+/* ---------- Router ---------- */
+function show(h){h=h||location.hash||'#/notecard';
+  $('#nav-notecard').classList.toggle('active',h==='#/notecard');
+  $('#nav-library').classList.toggle('active',h==='#/library');
+  $('#nav-graph').classList.toggle('active',h==='#/graph');
+  $('#view-notecard').style.display=h==='#/notecard'?'':'none';
+  $('#view-library').style.display=h==='#/library'?'':'none';
+  $('#view-graph').style.display=h==='#/graph'?'':'none';
+  if(h==='#/library'){renderProjectsBar();renderLibrary();}
+  if(h==='#/graph'){initPhysics(); renderCluster();}
+}
+addEventListener('hashchange',()=>show());
+window.addEventListener('load', () => show());
+
+/* ---------- Notecard ---------- */
+let leftMode='notes', currentId=null;
+function renderLeft(){const host=$('#left-list');host.innerHTML='';
+  if(leftMode==='notes'){
+    if(st.notes.length===0){host.innerHTML='<div class="item muted">No notes saved.</div>';return;}
+    st.notes.slice().sort((a,b)=>new Date(b.updated_at||b.created_at)-new Date(a.updated_at||a.created_at))
+      .forEach(n=>{const d=document.createElement('div');d.className='item';d.innerHTML=`<div class="t">${esc(n.title||'(untitled)')}</div><div class="muted">${esc(oneSentence(n.content))}</div>`;d.onclick=()=>load(n.id);host.appendChild(d);});
+  } else { renderSuggestions(); }
+}
+$('#tab-notes').onclick=()=>{leftMode='notes';$('#tab-notes').classList.add('active');$('#tab-suggestions').classList.remove('active');renderLeft();}
+$('#tab-suggestions').onclick=()=>{leftMode='suggestions';$('#tab-suggestions').classList.add('active');$('#tab-notes').classList.remove('active');renderLeft();}
+
+function chipTags(){const t=tagsOf($('#nc-tags').value);$('#tag-chips').innerHTML=t.map(x=>`<span class="chip">#${esc(x)}</span>`).join('');}
+$('#nc-tags').oninput=chipTags;
+
+function load(id){const n=st.notes.find(x=>x.id===id);if(!n)return;currentId=id;st.focusId=id;persist();$('#nc-title').value=n.title||'';$('#nc-content').value=n.content||'';$('#nc-tags').value=(n.tags||[]).join(', ');chipTags();}
+const draft=()=>({id:currentId||uid(),title:$('#nc-title').value.trim(),content:$('#nc-content').value,tags:tagsOf($('#nc-tags').value)});
+$('#btn-new-note').onclick=()=>{currentId=null;$('#nc-title').value='';$('#nc-content').value='';$('#nc-tags').value='';chipTags();}
+$('#btn-save-note').onclick=()=>{const n=draft();if(!n.title){alert('Title, please.');return;}const i=st.notes.findIndex(x=>x.id===n.id);const t=now();if(i>=0)st.notes[i]={...st.notes[i],...n,updated_at:t};else st.notes.push({...n,created_at:t,updated_at:t,debate:[]});persist();renderLeft();alert('Saved.');};
+$('#file-attach').onchange=e=>{const f=e.target.files[0];if(!f)return;if(!currentId){alert('Save the note first, then attach.');return;}const i=st.notes.findIndex(x=>x.id===currentId);st.notes[i].file={name:f.name,size:f.size,type:f.type};persist();alert('Attached (metadata only).');};
+
+/* suggestions */
+function suggestFor(n){const {edges}=buildGraph();const deg=degreeMap(edges);const kw=new Set((n.title||'').toLowerCase().split(/\W+/).filter(x=>x.length>3));const out=[];
+  st.notes.forEach(m=>{if(!m.title||m.id===n.id)return;const tagO=(m.tags||[]).filter(t=>(n.tags||[]).includes(t));
+    const wordO=(m.title||'').toLowerCase().split(/\W+/).filter(x=>x.length>3&&kw.has(x));
+    const score=tagO.length*2+wordO.length+(deg[m.id]||0)*0.1;if(score>0)out.push({id:m.id,title:m.title,reason:`Tags:${tagO.join(',')||'—'} Words:${wordO.join(',')||'—'} Links:${deg[m.id]||0}`});});
+  out.sort((a,b)=> b.reason.length-a.reason.length); return out.slice(0,12);
+}
+function renderSuggestions(){const host=$('#suggested');host.innerHTML='';const items=suggestFor(draft());if(items.length===0){host.innerHTML='<div class="muted">No suggestions yet.</div>';return;}
+  items.forEach(s=>{const d=document.createElement('div');d.className='sugg-item';d.innerHTML=`<b>${esc(s.title)}</b><div class="muted">${esc(s.reason)}</div>`;d.onclick=()=>{const ta=$('#nc-content');const txt=`[[${s.title}]]`;const p=ta.selectionStart||ta.value.length;ta.value=ta.value.slice(0,p)+txt+ta.value.slice(p);ta.selectionStart=ta.selectionEnd=p+txt.length;ta.focus();};host.appendChild(d);});
+}
+$('#btn-run-suggest').onclick=renderSuggestions;
+
+/* ---------- Agents (prompts) ---------- */
+const defaultPrompts = {
+  "Historian": {"system":"You are a meticulous historian. Provide context and precedents.","user":"Note title: {title}\nNote text:\n{text}\nWrite 1–2 tight paragraphs with parallels and what to watch.","temperature":0.6,"model":"gpt-4o-mini"},
+  "Economist": {"system":"You are a pragmatic macroeconomist. Quantify where possible.","user":"Given the note “{title}”:\n{text}\nReturn bullets for mechanisms, data to check, and a base/alt scenario.","temperature":0.5,"model":"gpt-4o-mini"},
+  "Contrarian": {"system":"You challenge assumptions with evidence; be constructive.","user":"Critique key assumptions in “{title}”.\n{text}\nGive 3–5 counterpoints and 2 falsification tests.","temperature":0.7},
+  "BlindSpot": {"system":"Identify omissions and risks.","user":"For “{title}”, list blind spots, missing stakeholders, and unintended consequences.\n{text}\nReturn a short checklist.","temperature":0.5},
+  "Interconnectedness": {"system":"Map second- and third-order links across domains.","user":"Note “{title}”:\n{text}\nGive a compact map of 2nd/3rd-order effects and which prior notes to link to (just titles).","temperature":0.6}
+};
+async function loadPrompts(){
+  try{const res=await fetch('prompts.json',{cache:'no-store'}); st.prompts = res.ok? await res.json() : defaultPrompts;}
+  catch{st.prompts = defaultPrompts;}
+}
+loadPrompts();
+
+async function askAgent(){
+  const agentKey=$('#debate-agent').value;
+  const P=st.prompts[agentKey]||defaultPrompts[agentKey]||defaultPrompts.Historian;
+  const note=draft();
+  const body={
+    model: P.model || 'gpt-4o-mini',
+    temperature: P.temperature ?? 0.7,
+    messages: [
+      { role:'system', content: P.system || 'You are a helpful assistant.' },
+      { role:'user', content: (P.user||'').replaceAll('{title}', note.title||'').replaceAll('{text}', note.content||'') }
+    ]
+  };
+  $('#debate-output').textContent='Thinking…';
+  try{
+    const r=await fetch('https://api.openai.com/v1/chat/completions',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+OPENAI_KEY},
+      body:JSON.stringify(body)
+    });
+    if(!r.ok) throw new Error(await r.text());
+    const data=await r.json();
+    $('#debate-output').textContent = data.choices?.[0]?.message?.content || '(no text)';
+  }catch(err){ $('#debate-output').textContent='Agent error: '+err.message; }
+}
+$('#debate-ask').onclick=askAgent;
+$('#debate-add').onclick=()=>{const t=$('#debate-output').textContent.trim(); if(!t){alert('Ask AI first, or type something.');return;} const n=st.notes.find(x=>x.id===currentId); if(!n){alert('Save the note first.');return;} n.debate=n.debate||[]; n.debate.push({who:$('#debate-agent').value,text:t,at:now()}); n.updated_at=now(); persist(); alert('Added to note.'); };
+
+/* ---------- Projects pinned bar ---------- */
+function projectsMap(){const m={};st.notes.forEach(n=>(n.tags||[]).forEach(t=>{const l=t.toLowerCase();if(l.startsWith('project')||l.startsWith('proj:'))(m[t]=m[t]||[]).push(n.id);}));return m;}
+function renderProjectsBar(){const bar=$('#projects-bar');bar.innerHTML='';const map=projectsMap();const names=Object.keys(map).sort((a,b)=>a.localeCompare(b));
+  if(!names.length){bar.innerHTML='<span class="muted">No projects yet. Add tags like “project:Atlas”.</span>';return;}
+  names.forEach(name=>{const c=document.createElement('div');c.className='proj-card';c.innerHTML=`📁 <b>${esc(name)}</b> <span class="count">${map[name].length}</span>`;
+    c.onclick=()=>{st.projFilter=name;persist();$('#lib-active-project').textContent=`Project: ${name} ✕`;$('#lib-active-project').style.display='inline-flex';renderLibrary();};
+    bar.appendChild(c);
+  });
 }
 
-/* =======================
-   STORAGE KEYS
-======================= */
-const KEY_NOTES = 'notes.v1';
-const KEY_LINK_COUNTS = 'linkCounts.v1';
-
-/* =======================
-   STATE
-======================= */
-let notes = load(KEY_NOTES, []);
-let linkCounts = load(KEY_LINK_COUNTS, {}); // { "Link Name": count }
-let activeNoteId = null;
-
-/* =======================
-   HELPERS
-======================= */
-function load(key, fallback){
-  try{ return JSON.parse(localStorage.getItem(key)) ?? fallback; }catch{ return fallback; }
+/* ---------- Library ---------- */
+function renderLibrary(){
+  $('#lib-min-links-val').textContent=$('#lib-min-links').value;
+  const size=+$('#lib-size').value, search=$('#lib-search').value.toLowerCase(), tags=tagsOf($('#lib-tag-filter').value);
+  const {edges}=buildGraph(); const deg=degreeMap(edges);
+  let items=st.notes.slice();
+  if(st.projFilter){const set=new Set(projectsMap()[st.projFilter]||[]);items=items.filter(n=>set.has(n.id));}
+  if(search) items=items.filter(n=>(n.title||'').toLowerCase().includes(search)||(n.content||'').toLowerCase().includes(search));
+  if(tags.length) items=items.filter(n=>tags.every(t=>(n.tags||[]).includes(t)));
+  const min=+$('#lib-min-links').value; if(min>0) items=items.filter(n=>(deg[n.id]||0)>=min);
+  const newest=$('#lib-sort').checked; items.sort((a,b)=>(newest?1:-1)*(new Date(b.updated_at||b.created_at)-new Date(a.updated_at||a.created_at)));
+  const grid=$('#lib-grid'); grid.style.gridTemplateColumns=`repeat(auto-fill,minmax(${size}px,1fr))`;
+  grid.innerHTML=items.map(n=>`<article class="card" data-id="${n.id}"><div class="title">${esc(n.title||'(untitled)')}</div><div class="preview">${esc((n.content||'').slice(0,140))}${(n.content||'').length>140?'…':''}</div><div class="meta"><span class="badge">#${(n.tags||[]).length} tags</span><span class="badge">${(deg[n.id]||0)} links</span></div></article>`).join('')||'<div class="muted">No results.</div>';
+  $$('#lib-grid .card').forEach(c=>c.onclick=()=>{const id=c.getAttribute('data-id');st.focusId=id;persist();location.hash='#/notecard';load(id);renderLeft();});
 }
-function save(key, value){
-  localStorage.setItem(key, JSON.stringify(value));
-}
-function uid(){ return 'n_'+Math.random().toString(36).slice(2,9); }
-function fmtDate(ts){ const d=new Date(ts); return d.toLocaleString(); }
+$('#lib-size').oninput=renderLibrary; $('#lib-search').oninput=renderLibrary; $('#lib-tag-filter').oninput=renderLibrary;
+$('#lib-min-links').oninput=e=>{$('#lib-min-links-val').textContent=e.target.value; renderLibrary();};
+$('#lib-sort').onchange=renderLibrary;
+$('#lib-clear').onclick=()=>{st.projFilter=null;$('#lib-active-project').style.display='none';$('#lib-search').value='';$('#lib-tag-filter').value='';$('#lib-min-links').value='0';$('#lib-min-links-val').textContent='0';persist();renderProjectsBar();renderLibrary();};
+$('#lib-active-project').onclick=()=>{$('#lib-clear').click();};
 
-function extractLinks(text){
-  const out=[]; if(!text) return out;
-  const re=/\[\[([^\[\]]+)\]\]/g; let m;
-  while((m=re.exec(text))){ const name=m[1].trim(); if(name) out.push(name); }
-  return out;
+/* ===================== Physics Graph (d3-force with zoom/pan + tag similarity) ===================== */
+let sim=null, nodes=[], links=[];
+const g = { G: 60, pad: 6, linkBase: 110, simW: 1.0, paused:false, focusPull: 0.65 };
+
+const canvas = $('#gcanvas'), ctx = canvas.getContext('2d');
+let transform = {k:1, x:0, y:0};
+const tooltip = $('#gtooltip');
+
+function resizeCanvas(){
+  const rect = canvas.getBoundingClientRect();
+  const dpr = window.devicePixelRatio||1;
+  canvas.width = Math.max(2, Math.floor(rect.width * dpr));
+  canvas.height = Math.max(2, Math.floor(rect.height * dpr));
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  draw();
+}
+window.addEventListener('resize', ()=>{ resizeCanvas(); if(sim) sim.alpha(0.3).restart(); });
+
+const zoom = d3.zoom()
+  .scaleExtent([0.2, 6])
+  .on('zoom', (ev)=>{
+    transform = {k: ev.transform.k, x: ev.transform.x, y: ev.transform.y};
+    draw();
+  });
+d3.select(canvas).call(zoom);
+
+$('#gr-resetview').onclick = ()=>{
+  const dpr = window.devicePixelRatio||1;
+  const cx = (canvas.width/dpr)/2, cy = (canvas.height/dpr)/2;
+  transform = {k:1, x: cx, y: cy};
+  d3.select(canvas).call(zoom.transform, d3.zoomIdentity.translate(transform.x, transform.y).scale(transform.k));
+};
+
+function simTags(tagsA, tagsB){
+  const A = new Set((tagsA||[]).map(s=>s.toLowerCase()));
+  const B = new Set((tagsB||[]).map(s=>s.toLowerCase()));
+  if(A.size===0 && B.size===0) return 0;
+  let inter=0; A.forEach(t=>{ if(B.has(t)) inter++; });
+  const uni = A.size + B.size - inter;
+  return inter / uni;
 }
 
-function recountLinksFromAllNotes(){
-  const counts={};
-  for(const n of notes){
-    const unique = new Set(extractLinks(n.content));
-    for(const name of unique){
-      counts[name] = (counts[name]||0)+1;
+function dataForPhysics(){
+  const {edges}=buildGraph(); 
+  const deg=degreeMap(edges);
+  const breadth=+$('#gr-breadth').value; 
+  const focus=st.focusId; 
+  const depth=+$('#gr-depth').value;
+  $('#gr-breadth-val').textContent=breadth; 
+  $('#gr-depth-val').textContent=depth;
+
+  let allowed=new Set(st.notes.map(n=>n.id));
+  if(focus){
+    const neigh=neighborsMap(edges);
+    allowed=new Set([focus]); 
+    let frontier=new Set([focus]);
+    for(let d=0; d<depth; d++){
+      const nxt=new Set();
+      frontier.forEach(v=> (neigh[v]||new Set()).forEach(u=>nxt.add(u)));
+      nxt.forEach(v=>allowed.add(v));
+      frontier=nxt;
     }
   }
-  linkCounts = counts;
-  save(KEY_LINK_COUNTS, linkCounts);
+
+  const nodeList = st.notes
+    .filter(n=> allowed.has(n.id) && (deg[n.id]||0)>=breadth)
+    .map(n=>{
+      const k = deg[n.id]||0;
+      const mass = 1 + Math.sqrt(k);
+      const r = 10 + k*2;
+      return { id:n.id, title:n.title||'(untitled)', degree:k, mass, r, tags:n.tags||[], x: (Math.random()-0.5)*200, y: (Math.random()-0.5)*200 };
+    });
+
+  const idToNode = new Map(nodeList.map(n=>[n.id,n]));
+  const linkList = edges
+    .filter(e=> idToNode.has(e.source) && idToNode.has(e.target))
+    .map(e=>{
+      const a = idToNode.get(e.source), b = idToNode.get(e.target);
+      const s = simTags(a.tags, b.tags);
+      return {source:a, target:b, sim:s};
+    });
+
+  return {nodeList, linkList};
 }
 
-/* =======================
-   RENDER
-======================= */
-const notesListEl = document.getElementById('notesList');
-const popularLinksEl = document.getElementById('popularLinks');
-const titleEl = document.getElementById('title');
-const contentEl = document.getElementById('content');
-const suggestionsEl = document.getElementById('suggestions');
-
-function renderNotesList(){
-  notesListEl.innerHTML='';
-  const sorted=[...notes].sort((a,b)=>b.updated-a.updated);
-  for(const n of sorted){
-    const div=document.createElement('div');
-    div.className='noteItem';
-    div.tabIndex=0;
-    div.innerHTML=`
-      <div class="noteTitle">${escapeHtml(n.title || '(Untitled)')}</div>
-      <div class="noteMeta">Updated ${fmtDate(n.updated)}</div>
-    `;
-    div.onclick=()=>loadNote(n.id);
-    div.onkeydown=(e)=>{ if(e.key==='Enter') loadNote(n.id); };
-    notesListEl.appendChild(div);
-  }
-}
-
-function renderPopularLinks(){
-  popularLinksEl.innerHTML='';
-  const entries = Object.entries(linkCounts).sort((a,b)=>b[1]-a[1]).slice(0,30);
-  for(const [name,count] of entries){
-    const span=document.createElement('span');
-    span.className='tag';
-    span.textContent = `${name} (${count})`;
-    popularLinksEl.appendChild(span);
-  }
-}
-
-function escapeHtml(s){
-  return s.replace(/[&<>"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
-}
-
-/* =======================
-   CRUD
-======================= */
-function newNote(){
-  const n={ id:uid(), title:'', content:'', created:Date.now(), updated:Date.now() };
-  notes.unshift(n);
-  activeNoteId=n.id;
-  save(KEY_NOTES, notes);
-  titleEl.value=''; contentEl.value='';
-  renderNotesList(); renderPopularLinks();
-  titleEl.focus();
-}
-
-function loadNote(id){
-  const n = notes.find(x=>x.id===id);
-  if(!n) return;
-  activeNoteId=id;
-  titleEl.value=n.title||'';
-  contentEl.value=n.content||'';
-  hideSuggestions();
-}
-
-function deleteNote(){
-  if(!activeNoteId) return;
-  notes = notes.filter(n=>n.id!==activeNoteId);
-  activeNoteId=null;
-  save(KEY_NOTES, notes);
-  recountLinksFromAllNotes();
-  renderNotesList(); renderPopularLinks();
-  titleEl.value=''; contentEl.value='';
-}
-
-function saveNote(){
-  if(!activeNoteId) newNote(); // ensure there is an active note
-  const idx = notes.findIndex(n=>n.id===activeNoteId);
-  const isNew = idx===-1;
-  const now = Date.now();
-  const payload = {
-    id: activeNoteId,
-    title: titleEl.value.trim(),
-    content: contentEl.value,
-    created: isNew ? now : notes[idx].created,
-    updated: now
+/* Theme-aware colors for canvas */
+function themeColors(){
+  const cs = getComputedStyle(document.documentElement);
+  return {
+    edge: cs.getPropertyValue('--g-edge').trim() || '#cbd5e1',
+    node: cs.getPropertyValue('--g-node').trim() || '#0ea5e9',
+    stroke: cs.getPropertyValue('--g-stroke').trim() || '#0f172a',
+    label: cs.getPropertyValue('--g-label').trim() || '#0f172a'
   };
-  if(isNew) notes.unshift(payload); else notes[idx]=payload;
-
-  // Update link popularity
-  recountLinksFromAllNotes(); // recompute from all notes for accuracy
-
-  save(KEY_NOTES, notes);
-  renderNotesList(); renderPopularLinks();
 }
 
-/* =======================
-   SUGGESTIONS: [[wiki]] autocomplete
-======================= */
-let activeIndex = -1; // keyboard highlight index
-let currentMatches = [];
+function draw(){
+  const dpr = window.devicePixelRatio||1;
+  const w = canvas.width/dpr, h = canvas.height/dpr;
+  const col = themeColors();
 
-function showSuggestions(results){
-  if(!results.length){ hideSuggestions(); return; }
-  suggestionsEl.innerHTML='';
-  results.forEach((item,i)=>{
-    const div=document.createElement('div');
-    div.className='sug-item';
-    div.setAttribute('role','option');
-    if(i===activeIndex) div.classList.add('active');
-    div.innerHTML = `<span>${escapeHtml(item.name)}</span><span class="sug-count">${item.count}</span>`;
-    div.onclick=()=>insertSuggestion(item.name);
-    suggestionsEl.appendChild(div);
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  ctx.save();
+  ctx.translate(transform.x, transform.y);
+  ctx.scale(transform.k, transform.k);
+
+  ctx.lineWidth = 1.5/transform.k; ctx.strokeStyle = col.edge;
+  links.forEach(l=>{ ctx.beginPath(); ctx.moveTo(l.source.x, l.source.y); ctx.lineTo(l.target.x, l.target.y); ctx.stroke(); });
+
+  nodes.forEach(n=>{
+    ctx.beginPath();
+    ctx.fillStyle = col.node;
+    ctx.strokeStyle = col.stroke;
+    ctx.lineWidth = 2/transform.k;
+    ctx.arc(n.x, n.y, n.r, 0, Math.PI*2);
+    ctx.fill(); ctx.stroke();
+
+    ctx.save();
+    ctx.scale(1/transform.k, 1/transform.k);
+    ctx.fillStyle=col.label;
+    ctx.font='10px system-ui, sans-serif';
+    const text = n.title.length>34 ? n.title.slice(0,34)+'…' : n.title;
+    const labelX = (n.x*transform.k) - (ctx.measureText(text).width/2);
+    const labelY = (n.y*transform.k) - (n.r*transform.k + 6);
+    ctx.fillText(text, labelX, labelY);
+    ctx.restore();
   });
-  // Position: under the textarea (simple & robust)
-  const rect=contentEl.getBoundingClientRect();
-  suggestionsEl.style.left = rect.left + window.scrollX + 'px';
-  suggestionsEl.style.top  = (rect.bottom + window.scrollY + 6) + 'px';
-  suggestionsEl.style.width = rect.width + 'px';
-  suggestionsEl.style.display='block';
+
+  ctx.restore();
 }
 
-function hideSuggestions(){
-  suggestionsEl.style.display='none';
-  activeIndex=-1;
-  currentMatches=[];
-}
-
-function findTrigger(){
-  // Text up to caret; look for `[[...` not yet closed
-  const pos = contentEl.selectionStart;
-  const text = contentEl.value.substring(0,pos);
-  const m = text.match(/\[\[([^\]]*)$/);
-  if(!m) return null;
-  return m[1]; // the typed portion after [[
-}
-
-function computeMatches(queryRaw){
-  const q = (queryRaw||'').toLowerCase();
-  const entries = Object.entries(linkCounts);
-  const filtered = entries
-    .filter(([name]) => name.toLowerCase().includes(q))
-    .map(([name,count])=>({name, count}))
-    .sort((a,b)=> b.count - a.count || a.name.localeCompare(b.name))
-    .slice(0,20);
-  return filtered;
-}
-
-function insertSuggestion(name){
-  const pos = contentEl.selectionStart;
-  const before = contentEl.value.substring(0,pos);
-  const after  = contentEl.value.substring(pos);
-  const replaced = before.replace(/\[\[[^\]]*$/, `[[${name}]]`);
-  contentEl.value = replaced + after;
-  // Move caret to end of inserted ]] pair
-  const newPos = replaced.length;
-  contentEl.setSelectionRange(newPos,newPos);
-  contentEl.focus();
-  hideSuggestions();
-}
-
-contentEl.addEventListener('input', onTypeOrCursor);
-contentEl.addEventListener('keyup', onTypeOrCursor);
-contentEl.addEventListener('click', onTypeOrCursor);
-contentEl.addEventListener('keydown', (e)=>{
-  if(suggestionsEl.style.display==='block'){
-    if(e.key==='ArrowDown'){ e.preventDefault(); activeIndex = Math.min(activeIndex+1, currentMatches.length-1); showSuggestions(currentMatches); }
-    else if(e.key==='ArrowUp'){ e.preventDefault(); activeIndex = Math.max(activeIndex-1, 0); showSuggestions(currentMatches); }
-    else if(e.key==='Enter'){ 
-      if(activeIndex>=0){ e.preventDefault(); insertSuggestion(currentMatches[activeIndex].name); }
-    } else if(e.key==='Escape'){ hideSuggestions(); }
+function nodeAtWorld(x,y){
+  for(let i=nodes.length-1;i>=0;i--){
+    const n=nodes[i]; const dx=x-n.x, dy=y-n.y;
+    if(dx*dx+dy*dy <= (n.r+6)*(n.r+6)) return n;
   }
-});
-
-document.addEventListener('click', (e)=>{
-  if(!suggestionsEl.contains(e.target) && e.target!==contentEl){ hideSuggestions(); }
-});
-
-function onTypeOrCursor(){
-  const partial = findTrigger();
-  if(partial===null){ hideSuggestions(); return; }
-  currentMatches = computeMatches(partial);
-  activeIndex = currentMatches.length ? 0 : -1;
-  showSuggestions(currentMatches);
+  return null;
 }
 
-/* =======================
-   INIT + UI HOOKS
-======================= */
-document.getElementById('newNote').onclick=newNote;
-document.getElementById('deleteNote').onclick=deleteNote;
-document.getElementById('save').onclick=saveNote;
+function pointerToWorld(ev){
+  const rect = canvas.getBoundingClientRect();
+  const px = ev.clientX - rect.left;
+  const py = ev.clientY - rect.top;
+  return { x: (px - transform.x)/transform.k, y: (py - transform.y)/transform.k };
+}
 
-(function init(){
-  // First load: build linkCounts if missing
-  if(Object.keys(linkCounts).length===0 && notes.length>0){
-    recountLinksFromAllNotes();
+function handleHover(ev){
+  const w = pointerToWorld(ev);
+  const n = nodeAtWorld(w.x,w.y);
+  if(n){
+    tooltip.style.opacity=1;
+    tooltip.style.left = (ev.clientX+12)+'px';
+    tooltip.style.top = (ev.clientY+12)+'px';
+    tooltip.textContent = `${n.title}  ·  deg ${n.degree}`;
+    canvas.style.cursor='pointer';
+  }else{
+    tooltip.style.opacity=0;
+    canvas.style.cursor='grab';
   }
-  renderNotesList();
-  renderPopularLinks();
-  // If there are notes, load the newest
-  if(notes.length){ loadNote(notes[0].id); }
-})();
+}
+
+function handleClick(ev){
+  const w = pointerToWorld(ev);
+  const n = nodeAtWorld(w.x,w.y);
+  if(n){
+    st.focusId = n.id; 
+    persist();
+    initPhysics();    // rebuild around focus (depth filter), re-center
+    renderCluster();
+  }
+}
+
+let isDragging = false, dragNode = null;
+function handleDown(ev){
+  const w = pointerToWorld(ev);
+  const n = nodeAtWorld(w.x,w.y);
+  if(n){
+    dragNode = n; isDragging=true; canvas.style.cursor='grabbing';
+    n.fx = n.x; n.fy = n.y;
+    if(sim) sim.alphaTarget(0.7).restart();
+    ev.preventDefault();
+  }
+}
+function handleMove(ev){
+  if(!isDragging || !dragNode){ handleHover(ev); return; }
+  const w = pointerToWorld(ev);
+  dragNode.fx = w.x; dragNode.fy = w.y;
+  draw();
+}
+function handleUp(){
+  if(dragNode){ dragNode.fx = null; dragNode.fy = null; }
+  if(sim) sim.alphaTarget(0).restart();
+  dragNode=null; isDragging=false; canvas.style.cursor='grab';
+}
+
+canvas.addEventListener('mousemove', handleMove);
+canvas.addEventListener('mousedown', handleDown);
+canvas.addEventListener('mouseup', handleUp);
+canvas.addEventListener('mouseleave', handleUp);
+canvas.addEventListener('click', handleClick);
+
+$('#gr-G').oninput = ()=>{ $('#gr-G-val').textContent=$('#gr-G').value; g.G=+$('#gr-G').value; if(sim){ sim.force('attract').strength(d=>+g.G*d.mass); sim.alpha(0.3).restart(); }};
+$('#gr-pad').oninput = ()=>{ $('#gr-pad-val').textContent=$('#gr-pad').value; g.pad=+$('#gr-pad').value; if(sim){ sim.force('collide').radius(d=>d.r+g.pad+(st.focusId&&d.id===st.focusId?Math.max(2,g.pad*1.25):0)); sim.alpha(0.3).restart(); }};
+$('#gr-link').oninput = ()=>{ $('#gr-link-val').textContent=$('#gr-link').value; g.linkBase=+$('#gr-link').value; if(sim){ updateLinkForce(); sim.alpha(0.3).restart(); }};
+$('#gr-simw').oninput = ()=>{ $('#gr-simw-val').textContent=(+$('#gr-simw').value).toFixed(1); g.simW=+$('#gr-simw').value; if(sim){ updateLinkForce(); sim.alpha(0.3).restart(); }};
+$('#gr-breadth').oninput = ()=>{ initPhysics(); };
+$('#gr-depth').oninput = ()=>{ initPhysics(); };
+$('#gr-reset-focus').onclick = ()=>{ st.focusId=null; persist(); initPhysics(); renderCluster(); };
+$('#gr-pause').onclick = ()=>{ g.paused=!g.paused; if(g.paused){ sim.stop(); $('#gr-pause').textContent='Resume'; }else{ sim.alpha(0.4).restart(); $('#gr-pause').textContent='Pause'; }};
+$('#gr-reheat').onclick = ()=>{ if(sim){ sim.alpha(0.9).restart(); }};
+
+function updateLinkForce(){
+  if(!sim) return;
+  const fLink = sim.force('link');
+  fLink.distance(d=> Math.max(40, g.linkBase * (1 - 0.5 * g.simW * d.sim)));
+  fLink.strength(d=> Math.min(1.5, 0.08 * (1 + 1.5 * g.simW * d.sim)));
+}
+
+function initPhysics(){
+  g.G = +$('#gr-G').value; $('#gr-G-val').textContent=g.G;
+  g.pad = +$('#gr-pad').value; $('#gr-pad-val').textContent=g.pad;
+  g.linkBase = +$('#gr-link').value; $('#gr-link-val').textContent=g.linkBase;
+  g.simW = +$('#gr-simw').value; $('#gr-simw-val').textContent=g.simW.toFixed(1);
+
+  const focus = st.focusId;
+
+  const {nodeList, linkList} = dataForPhysics();
+  nodes = nodeList; 
+  links = linkList;
+
+  resizeCanvas();
+
+  const dpr = window.devicePixelRatio||1;
+  const cx = (canvas.width/dpr)/2, cy = (canvas.height/dpr)/2;
+  transform = {k:1, x: cx, y: cy};
+  d3.select(canvas).call(zoom.transform, d3.zoomIdentity.translate(transform.x, transform.y).scale(transform.k));
+
+  if(sim) sim.stop();
+
+  const fLink = d3.forceLink(links).id(d=>d.id);
+  const fAttract = d3.forceManyBody().strength(d => +g.G * d.mass).theta(0.9);
+
+  const fCollide = d3.forceCollide().radius(d => {
+    const extra = (focus && d.id===focus) ? Math.max(2, g.pad * 1.25) : 0;
+    return d.r + g.pad + extra;
+  }).iterations(2);
+
+  const fRepel = d3.forceManyBody().strength(d => -20 * (1 + 0.3*d.mass));
+  const fFocus = d3.forceRadial(0, 0, 0).strength(d => (focus && d.id===focus) ? g.focusPull : 0);
+  const velocityDecay = 0.3;
+
+  sim = d3.forceSimulation(nodes)
+    .force('link', fLink)
+    .force('attract', fAttract)
+    .force('repel', fRepel)
+    .force('collide', fCollide)
+    .force('focus', fFocus)
+    .force('center', d3.forceCenter(0, 0))
+    .velocityDecay(velocityDecay)
+    .alpha(0.9)
+    .on('tick', draw);
+
+  updateLinkForce();
+
+  canvas.style.cursor='grab';
+  if(g.paused) sim.stop();
+  draw();
+}
+
+/* ---------- Card Cluster (uses focusId) ---------- */
+function renderCluster(){
+  const size=+$('#cl-size').value, depth=+$('#cl-depth').value, focus=st.focusId; 
+  const {edges}=buildGraph(); const neigh=neighborsMap(edges);
+  const focusNote=st.notes.find(n=>n.id===focus);
+  $('#cl-focus').innerHTML=focusNote?`<div style="font-weight:700">${esc(focusNote.title||'(untitled)')}</div><div class="mono" style="white-space:pre-wrap">${esc((focusNote.content||'').slice(0,220))}${(focusNote.content||'').length>220?'…':''}</div><div class="chips" style="margin-top:6px">${(focusNote.tags||[]).map(t=>`<span class="chip">#${esc(t)}</span>`).join('')}</div>`:'<div class="muted">No focus selected.</div>';
+  const canvasEl=$('#cl-canvas'); canvasEl.innerHTML=''; $('#cl-links').textContent='';
+  if(!focusNote) return;
+
+  const seen=new Set([focus]); let frontier=new Set([focus]); const levels={[focus]:0};
+  for(let d=0; d<depth; d++){ const nxt=new Set(); frontier.forEach(v=> (neigh[v]||new Set()).forEach(u=>{ if(!seen.has(u)){ seen.add(u); nxt.add(u); levels[u]=d+1; } })); frontier=nxt; }
+  seen.delete(focus);
+  $('#cl-links').textContent=Array.from(seen).map(id=>`• (${levels[id]}) ${st.notes.find(x=>x.id===id)?.title||id}`).join('\n');
+
+  Array.from(seen).forEach(id=>{ const n=st.notes.find(x=>x.id===id); if(!n) return; const card=document.createElement('article'); card.className='note-card'; card.style.width=size+'px'; card.innerHTML=`
+      <div style="font-weight:700">${esc(n.title||'(untitled)')}</div>
+      <div class="mono" style="white-space:pre-wrap">${esc((n.content||'').slice(0,160))}${(n.content||'').length>160?'…':''}</div>
+      <div class="chips" style="margin-top:6px">${(n.tags||[]).map(t=>`<span class="chip">#${esc(t)}</span>`).join('')}</div>
+      <div class="row" style="margin-top:6px">
+        <button class="btn" data-open="${n.id}">Open</button>
+        <button class="btn" data-link="${n.title}">[[Link]]</button>
+      </div>`; canvasEl.appendChild(card); });
+  $$('[data-open]').forEach(b=> b.onclick=()=>{ const id=b.getAttribute('data-open'); location.hash='#/notecard'; load(id); renderLeft(); });
+  $$('[data-link]').forEach(b=> b.onclick=()=>{ const title=b.getAttribute('data-link'); location.hash='#/notecard'; const ta=$('#nc-content'); const txt=`[[${title}]]`; const p=ta.selectionStart||ta.value.length; ta.value=ta.value.slice(0,p)+txt+ta.value.slice(p); ta.selectionStart=ta.selectionEnd=p+txt.length; ta.focus(); });
+}
+$('#cl-size').oninput=renderCluster; $('#cl-depth').oninput=renderCluster;
+
+/* ---------- Import/Export ---------- */
+$('#btn-export').onclick=()=>{const data=JSON.stringify({notes:st.notes},null,2);const url=URL.createObjectURL(new Blob([data],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download='willow_export.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),500);};
+$('#file-import').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const text=await f.text();const data=JSON.parse(text);st.notes=Array.isArray(data)?data:(Array.isArray(data.notes)?data.notes:[]);persist();alert('Imported.');renderLeft();renderProjectsBar();renderLibrary();initPhysics();renderCluster();}catch{alert('Invalid JSON.');}};
+
+/* ---------- Boot demo if empty ---------- */
+if(st.notes.length===0){const A={id:uid(),title:'Bank Funding Stress',content:'Deposits → MMFs. [[CRE Exposures]] [[Regional Banks]]',tags:['banking','risk','project:Atlas'],created_at:now(),updated_at:now(),debate:[]};
+  const B={id:uid(),title:'CRE Exposures',content:'Office vacancy high; maturities in 26–27. [[Policy Path]]',tags:['cre','risk','project:Borealis'],created_at:now(),updated_at:now(),debate:[]};
+  const C={id:uid(),title:'Policy Path',content:'Higher-for-longer; term premium.',tags:['policy','macro','project:Cascade'],created_at:now(),updated_at:now(),debate:[]};
+  const D={id:uid(),title:'Regional Banks',content:'Unrealized losses + deposit flight. [[Bank Funding Stress]]',tags:['banking','project:Drift'],created_at:now(),updated_at:now(),debate:[]};
+  st.notes.push(A,B,C,D); persist();
+}
+renderLeft(); renderProjectsBar(); renderLibrary();
 </script>
 </body>
 </html>
