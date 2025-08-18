@@ -160,7 +160,7 @@
         <canvas id="gcanvas" width="1000" height="520"></canvas>
         <div id="gtooltip" class="tooltip"></div>
       </div>
-      <div class="muted" style="margin-top:8px">Zoom: wheel / pinch • Pan: drag empty space • Drag a node to move it • Click node to focus.</div>
+      <div class="muted" style="margin-top:8px">Zoom: wheel / pinch • Pan: drag empty space • Drag a node to move it • Click node to focus (center & filter by Depth).</div>
     </div>
 
     <div class="pane" id="cluster-pane" style="margin-top:16px">
@@ -325,7 +325,7 @@ $('#lib-active-project').onclick=()=>{$('#lib-clear').click();};
 
 /* ===================== Physics Graph (d3-force with zoom/pan + tag similarity) ===================== */
 let sim=null, nodes=[], links=[];
-const g = { G: 60, pad: 6, linkBase: 110, simW: 1.0, paused:false };
+const g = { G: 60, pad: 6, linkBase: 110, simW: 1.0, paused:false, focusPull: 0.65 }; // focusPull = spring to center for focused node
 
 // Canvas + transform for zoom/pan
 const canvas = $('#gcanvas'), ctx = canvas.getContext('2d');
@@ -342,7 +342,6 @@ function resizeCanvas(){
 }
 window.addEventListener('resize', ()=>{ resizeCanvas(); if(sim) sim.alpha(0.3).restart(); });
 
-function toScreen(p){ return { x: p.x*transform.k + transform.x, y: p.y*transform.k + transform.y }; }
 function toWorld(px,py){ return { x: (px - transform.x)/transform.k, y: (py - transform.y)/transform.k }; }
 
 // d3-zoom on the canvas element
@@ -356,13 +355,13 @@ d3.select(canvas).call(zoom);
 
 // Reset view
 $('#gr-resetview').onclick = ()=>{
-  transform = {k:1, x: canvas.width/(window.devicePixelRatio||1)/2, y: canvas.height/(window.devicePixelRatio||1)/2};
-  // set zoom transform so wheel continues from here
-  const t = d3.zoomIdentity.translate(transform.x, transform.y).scale(transform.k);
-  d3.select(canvas).call(zoom.transform, t);
+  const dpr = window.devicePixelRatio||1;
+  const cx = (canvas.width/dpr)/2, cy = (canvas.height/dpr)/2;
+  transform = {k:1, x: cx, y: cy};
+  d3.select(canvas).call(zoom.transform, d3.zoomIdentity.translate(transform.x, transform.y).scale(transform.k));
 };
 
-// compute similarity between two notes (Jaccard on tags)
+// Tag similarity (Jaccard)
 function simTags(tagsA, tagsB){
   const A = new Set((tagsA||[]).map(s=>s.toLowerCase()));
   const B = new Set((tagsB||[]).map(s=>s.toLowerCase()));
@@ -372,22 +371,35 @@ function simTags(tagsA, tagsB){
   return inter / uni; // 0..1
 }
 
+// Build filtered data around focus & depth
 function dataForPhysics(){
-  const {edges}=buildGraph(); const deg=degreeMap(edges);
-  const breadth=+$('#gr-breadth').value; const focus=st.focusId; const depth=+$('#gr-depth').value;
-  $('#gr-breadth-val').textContent=breadth; $('#gr-depth-val').textContent=depth;
+  const {edges}=buildGraph(); 
+  const deg=degreeMap(edges);
+  const breadth=+$('#gr-breadth').value; 
+  const focus=st.focusId; 
+  const depth=+$('#gr-depth').value;
+  $('#gr-breadth-val').textContent=breadth; 
+  $('#gr-depth-val').textContent=depth;
 
   let allowed=new Set(st.notes.map(n=>n.id));
   if(focus){
     const neigh=neighborsMap(edges);
-    allowed=new Set([focus]); let frontier=new Set([focus]);
-    for(let d=0; d<depth; d++){ const nxt=new Set(); frontier.forEach(v=> (neigh[v]||new Set()).forEach(u=>nxt.add(u))); nxt.forEach(v=>allowed.add(v)); frontier=nxt; }
+    allowed=new Set([focus]); 
+    let frontier=new Set([focus]);
+    for(let d=0; d<depth; d++){
+      const nxt=new Set();
+      frontier.forEach(v=> (neigh[v]||new Set()).forEach(u=>nxt.add(u)));
+      nxt.forEach(v=>allowed.add(v));
+      frontier=nxt;
+    }
   }
-  const nodeList = st.notes.filter(n=> allowed.has(n.id) && (deg[n.id]||0)>=breadth)
+
+  const nodeList = st.notes
+    .filter(n=> allowed.has(n.id) && (deg[n.id]||0)>=breadth)
     .map(n=>{
       const k = deg[n.id]||0;
-      const mass = 1 + Math.sqrt(k);
-      const r = 10 + k*2;
+      const mass = 1 + Math.sqrt(k);     // heavier if more links
+      const r = 10 + k*2;                // visual radius scales with degree
       return { id:n.id, title:n.title||'(untitled)', degree:k, mass, r, tags:n.tags||[], x: (Math.random()-0.5)*200, y: (Math.random()-0.5)*200 };
     });
 
@@ -404,7 +416,8 @@ function dataForPhysics(){
 }
 
 function draw(){
-  const w = canvas.width/(window.devicePixelRatio||1), h = canvas.height/(window.devicePixelRatio||1);
+  const dpr = window.devicePixelRatio||1;
+  const w = canvas.width/dpr, h = canvas.height/dpr;
   ctx.clearRect(0,0,canvas.width,canvas.height);
 
   ctx.save();
@@ -425,7 +438,7 @@ function draw(){
     ctx.arc(n.x, n.y, n.r, 0, Math.PI*2);
     ctx.fill(); ctx.stroke();
 
-    // label above node (unscaled font size; scale inversely so visuals stay readable)
+    // label above node (unscaled font)
     ctx.save();
     ctx.scale(1/transform.k, 1/transform.k);
     ctx.fillStyle='#0f172a';
@@ -440,13 +453,6 @@ function draw(){
   ctx.restore();
 }
 
-let isDragging = false, dragNode = null;
-function pointerToWorld(ev){
-  const rect = canvas.getBoundingClientRect();
-  const px = ev.clientX - rect.left;
-  const py = ev.clientY - rect.top;
-  return toWorld(px, py);
-}
 function nodeAtWorld(x,y){
   for(let i=nodes.length-1;i>=0;i--){
     const n=nodes[i]; const dx=x-n.x, dy=y-n.y;
@@ -454,10 +460,19 @@ function nodeAtWorld(x,y){
   }
   return null;
 }
+
+function pointerToWorld(ev){
+  const rect = canvas.getBoundingClientRect();
+  const px = ev.clientX - rect.left;
+  const py = ev.clientY - rect.top;
+  return { x: (px - transform.x)/transform.k, y: (py - transform.y)/transform.k };
+}
+
+// Hover tooltip
 function handleHover(ev){
   const rect = canvas.getBoundingClientRect();
   const px = ev.clientX - rect.left, py = ev.clientY - rect.top;
-  const w = toWorld(px,py);
+  const w = pointerToWorld(ev);
   const n = nodeAtWorld(w.x,w.y);
   if(n){
     tooltip.style.opacity=1;
@@ -470,29 +485,42 @@ function handleHover(ev){
     if(!isDragging) canvas.style.cursor='grab';
   }
 }
+
+// Click to focus: center view, filter by Depth, rebuild sim
 function handleClick(ev){
   const w = pointerToWorld(ev);
   const n = nodeAtWorld(w.x,w.y);
-  if(n){ st.focusId = n.id; persist(); renderCluster(); }
+  if(n){
+    st.focusId = n.id; 
+    persist();
+    initPhysics();    // rebuild around focus (depth filter), re-center camera
+    renderCluster();
+  }
 }
+
+// Drag with physics resume
+let isDragging = false, dragNode = null;
 function handleDown(ev){
   const w = pointerToWorld(ev);
   const n = nodeAtWorld(w.x,w.y);
   if(n){
     dragNode = n; isDragging=true; canvas.style.cursor='grabbing';
-    n.fx = n.x; n.fy = n.y; // lock to start
-    if(sim) sim.alpha(0.4).restart();
+    n.fx = n.x; n.fy = n.y;                       // hold while dragging
+    if(sim) sim.alphaTarget(0.7).restart();       // reheat
     ev.preventDefault();
   }
 }
 function handleMove(ev){
-  if(!isDragging || !dragNode) { handleHover(ev); return; }
+  if(!isDragging || !dragNode){ handleHover(ev); return; }
   const w = pointerToWorld(ev);
-  dragNode.fx = w.x; dragNode.fy = w.y;
+  dragNode.fx = w.x; dragNode.fy = w.y;           // follow pointer
   draw();
 }
 function handleUp(){
-  if(dragNode){ dragNode.fx=null; dragNode.fy=null; }
+  if(dragNode){
+    dragNode.fx = null; dragNode.fy = null;       // release → physics takes over
+  }
+  if(sim) sim.alphaTarget(0).restart();
   dragNode=null; isDragging=false; canvas.style.cursor='grab';
 }
 
@@ -502,9 +530,9 @@ canvas.addEventListener('mouseup', handleUp);
 canvas.addEventListener('mouseleave', handleUp);
 canvas.addEventListener('click', handleClick);
 
-// controls
+// sliders & buttons
 $('#gr-G').oninput = ()=>{ $('#gr-G-val').textContent=$('#gr-G').value; g.G=+$('#gr-G').value; if(sim){ sim.force('attract').strength(d=>+g.G*d.mass); sim.alpha(0.3).restart(); }};
-$('#gr-pad').oninput = ()=>{ $('#gr-pad-val').textContent=$('#gr-pad').value; g.pad=+$('#gr-pad').value; if(sim){ sim.force('collide').radius(d=>d.r+g.pad); sim.alpha(0.3).restart(); }};
+$('#gr-pad').oninput = ()=>{ $('#gr-pad-val').textContent=$('#gr-pad').value; g.pad=+$('#gr-pad').value; if(sim){ sim.force('collide').radius(d=>d.r+g.pad+(st.focusId&&d.id===st.focusId?Math.max(2,g.pad*1.25):0)); sim.alpha(0.3).restart(); }};
 $('#gr-link').oninput = ()=>{ $('#gr-link-val').textContent=$('#gr-link').value; g.linkBase=+$('#gr-link').value; if(sim){ updateLinkForce(); sim.alpha(0.3).restart(); }};
 $('#gr-simw').oninput = ()=>{ $('#gr-simw-val').textContent=(+$('#gr-simw').value).toFixed(1); g.simW=+$('#gr-simw').value; if(sim){ updateLinkForce(); sim.alpha(0.3).restart(); }};
 $('#gr-breadth').oninput = ()=>{ initPhysics(); };
@@ -517,15 +545,11 @@ function updateLinkForce(){
   if(!sim) return;
   const fLink = sim.force('link');
   fLink.distance(d=>{
-    // shorter when similar; never less than 40
-    // dist = base * (1 - 0.5*simW*sim)
-    const dist = Math.max(40, g.linkBase * (1 - 0.5 * g.simW * d.sim));
+    const dist = Math.max(40, g.linkBase * (1 - 0.5 * g.simW * d.sim)); // nearer if similar
     return dist;
   });
   fLink.strength(d=>{
-    // stronger when similar; cap to keep stable
-    // base 0.08 * (1 + 1.5*simW*sim)
-    const s = 0.08 * (1 + 1.5 * g.simW * d.sim);
+    const s = 0.08 * (1 + 1.5 * g.simW * d.sim); // stronger if similar
     return Math.min(1.5, s);
   });
 }
@@ -537,20 +561,36 @@ function initPhysics(){
   g.linkBase = +$('#gr-link').value; $('#gr-link-val').textContent=g.linkBase;
   g.simW = +$('#gr-simw').value; $('#gr-simw-val').textContent=g.simW.toFixed(1);
 
-  const {nodeList, linkList} = dataForPhysics();
-  nodes = nodeList; links = linkList;
+  const focus = st.focusId;
+
+  const {nodeList, linkList} = dataForPhysics(); // already filtered by depth if focus exists
+  nodes = nodeList; 
+  links = linkList;
 
   resizeCanvas();
-  transform = {k:1, x: canvas.width/(window.devicePixelRatio||1)/2, y: canvas.height/(window.devicePixelRatio||1)/2};
+
+  // Center the camera on world origin
+  const dpr = window.devicePixelRatio||1;
+  const cx = (canvas.width/dpr)/2, cy = (canvas.height/dpr)/2;
+  transform = {k:1, x: cx, y: cy};
   d3.select(canvas).call(zoom.transform, d3.zoomIdentity.translate(transform.x, transform.y).scale(transform.k));
 
   if(sim) sim.stop();
 
   const fLink = d3.forceLink(links).id(d=>d.id);
-  // distance/strength configured below
   const fAttract = d3.forceManyBody().strength(d => +g.G * d.mass).theta(0.9);
-  const fCollide = d3.forceCollide().radius(d => d.r + g.pad).iterations(2);
+
+  // Focused node gets a bit more padding; others normal
+  const fCollide = d3.forceCollide().radius(d => {
+    const extra = (focus && d.id===focus) ? Math.max(2, g.pad * 1.25) : 0; // slightly larger for focus
+    return d.r + g.pad + extra;
+  }).iterations(2);
+
   const fRepel = d3.forceManyBody().strength(d => -20 * (1 + 0.3*d.mass));
+
+  // Soft centering spring only for the focused node (drag still works)
+  const fFocus = d3.forceRadial(0, 0, 0).strength(d => (focus && d.id===focus) ? g.focusPull : 0);
+
   const velocityDecay = 0.3;
 
   sim = d3.forceSimulation(nodes)
@@ -558,16 +598,15 @@ function initPhysics(){
     .force('attract', fAttract)
     .force('repel', fRepel)
     .force('collide', fCollide)
-    .force('center', d3.forceCenter(0, 0)) // we pan/zoom visually; keep world centered
+    .force('focus', fFocus)          // keeps focus near center, not pinned
+    .force('center', d3.forceCenter(0, 0))
     .velocityDecay(velocityDecay)
     .alpha(0.9)
     .on('tick', draw);
 
   updateLinkForce();
 
-  // interaction cursors
   canvas.style.cursor='grab';
-
   if(g.paused) sim.stop();
   draw();
 }
