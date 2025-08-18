@@ -486,8 +486,16 @@ function draw(){
   ctx.scale(transform.k, transform.k);
 
   // edges
-  ctx.lineWidth = 1.25/transform.k; ctx.strokeStyle = col.edge;
-  links.forEach(l=>{ ctx.beginPath(); ctx.moveTo(l.source.x, l.source.y); ctx.lineTo(l.target.x, l.target.y); ctx.stroke(); });
+  links.forEach(l=>{
+    const isFocus = (l.source.id === st.focusId || l.target.id === st.focusId);
+    ctx.beginPath();
+    ctx.lineWidth = isFocus ? 3/transform.k : 1.25/transform.k;
+    ctx.strokeStyle = isFocus ? col.stroke : col.edge; // darker for focus links
+    ctx.moveTo(l.source.x, l.source.y);
+    ctx.lineTo(l.target.x, l.target.y);
+    ctx.stroke();
+  });
+
 
   // nodes
   nodes.forEach(n=>{
