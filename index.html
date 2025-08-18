@@ -212,7 +212,10 @@ function show(h){h=h||location.hash||'#/notecard';
   if(h==='#/library'){renderProjectsBar();renderLibrary();}
   if(h==='#/graph'){initPhysics(); renderCluster();}
 }
-addEventListener('hashchange',()=>show()); show();
+addEventListener('hashchange', ()=>show());
+// Delay first render until after *all* const/let declarations exist
+window.addEventListener('load', () => show());
+
 
 /* ---------- Notecard ---------- */
 let leftMode='notes', currentId=null;
