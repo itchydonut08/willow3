@@ -1,9 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Willow 3</title>
+
+<!-- Load d3 BEFORE any code that uses it -->
+<script src="https://d3js.org/d3.v7.min.js"></script>
+
 <style>
 :root {
   --bg: #fafafa;
@@ -12,67 +16,41 @@
   --pane: #fff;
   --btn-bg: #f8f8f8;
   --btn-fg: #222;
+
+  --g-edge:#8aa2b4;
+  --g-node:#2a8cff;
+  --g-focus:#ff4d4d;
 }
 :root[data-theme="dark"] {
-  --bg: #181818;
-  --fg: #eee;
-  --line: #444;
-  --pane: #222;
-  --btn-bg: #333;
-  --btn-fg: #eee;
+  --bg: #0b1020;
+  --fg: #e5e7eb;
+  --line: #1f2937;
+  --pane: #0f172a;
+  --btn-bg: #111827;
+  --btn-fg: #e5e7eb;
+
+  --g-edge:#334155;
+  --g-node:#22d3ee;
+  --g-focus:#fb7185;
 }
 * { box-sizing: border-box; }
-body {
-  margin: 0;
-  font-family: system-ui, sans-serif;
-  background: var(--bg);
-  color: var(--fg);
-}
-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 10px 16px;
-  border-bottom: 1px solid var(--line);
-}
+body { margin: 0; font-family: system-ui, sans-serif; background: var(--bg); color: var(--fg); }
+header { display:flex; justify-content:space-between; align-items:center; padding:10px 16px; border-bottom:1px solid var(--line); background:var(--pane); position:sticky; top:0; z-index:1; }
 header h1 { font-size: 18px; margin: 0; }
-header .actions { display: flex; gap: 6px; }
-button {
-  border: 1px solid var(--line);
-  background: var(--btn-bg);
-  color: var(--btn-fg);
-  border-radius: 8px;
-  padding: 4px 10px;
-  cursor: pointer;
-}
-.wrap { display: flex; height: calc(100vh - 50px); }
-.sidebar {
-  width: 260px;
-  border-right: 1px solid var(--line);
-  padding: 8px;
-  overflow-y: auto;
-  background: var(--pane);
-}
-.main {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-}
-#graphPane {
-  flex: 1;
-  position: relative;
-  background: var(--pane);
-}
-canvas#gcanvas {
-  width: 100%;
-  height: 100%;
-  display: block;
-}
-.dark-toggle {
-  font-size: 18px;
-  background: none;
-  border: none;
-}
+header .actions { display:flex; gap:8px; }
+button { border:1px solid var(--line); background:var(--btn-bg); color:var(--btn-fg); border-radius:8px; padding:6px 10px; cursor:pointer; }
+.wrap { display:flex; height: calc(100vh - 54px); }
+.sidebar { width: 280px; border-right:1px solid var(--line); padding:10px; overflow:auto; background:var(--pane); }
+.main { flex:1; display:flex; flex-direction:column; }
+#graphPane { flex:1; position:relative; background:var(--pane); }
+#gcanvas { width:100%; height:100%; display:block; border-left:0; }
+.item { padding:8px 6px; border-bottom:1px dashed var(--line); cursor:pointer; }
+.item:hover { background: rgba(0,0,0,.04); }
+[data-theme="dark"] .item:hover { background: rgba(255,255,255,.05); }
+.row { display:flex; gap:8px; align-items:center; }
+.small { font-size:12px; opacity:.8; }
+.badge { border:1px solid var(--line); padding:2px 6px; border-radius:999px; font-size:11px; }
+.controls { display:flex; gap:10px; align-items:center; padding:8px 12px; border-top:1px solid var(--line); background:var(--pane); }
 </style>
 </head>
 <body>
@@ -81,160 +59,316 @@ canvas#gcanvas {
   <div class="actions">
     <button id="btn-import">Import</button>
     <button id="btn-export">Export</button>
-    <button id="btn-dark" class="dark-toggle">🌓</button>
+    <button id="btn-theme" title="Toggle dark mode">🌓</button>
   </div>
 </header>
+
 <div class="wrap">
   <aside class="sidebar">
-    <h3>Library</h3>
+    <div class="row" style="justify-content:space-between">
+      <b>Library</b>
+      <span class="small badge" id="count">0</span>
+    </div>
     <div id="library"></div>
   </aside>
+
   <main class="main">
     <div id="graphPane">
       <canvas id="gcanvas"></canvas>
+    </div>
+    <div class="controls">
+      <span class="small">Depth</span>
+      <input id="depth" type="range" min="1" max="6" step="1" value="6"/>
+      <span id="depthVal" class="badge">6</span>
+
+      <span class="small">Link base</span>
+      <input id="linkBase" type="range" min="40" max="220" step="5" value="110"/>
+      <span id="linkBaseVal" class="badge">110</span>
+
+      <span class="small">G</span>
+      <input id="grav" type="range" min="0" max="200" step="5" value="60"/>
+      <span id="gravVal" class="badge">60</span>
+
+      <span class="small">Pad</span>
+      <input id="pad" type="range" min="0" max="20" step="1" value="6"/>
+      <span id="padVal" class="badge">6</span>
+
+      <button id="btn-recenter">Reset View</button>
+      <button id="btn-clear">Clear Focus</button>
     </div>
   </main>
 </div>
 
 <script>
-// ========= Helpers =========
-const $ = sel => document.querySelector(sel);
+/* ========= tiny helpers FIRST so they exist before use ========= */
+const $ = s => document.querySelector(s);
+const $$ = s => Array.from(document.querySelectorAll(s));
 
-// ========= State =========
+/* ========= Dark mode ========= */
+const THEME_KEY='willow_theme';
+function applyTheme(t){ document.documentElement.setAttribute('data-theme', t); draw(); }
+(function initTheme(){
+  const saved=localStorage.getItem(THEME_KEY);
+  const prefersDark=window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  applyTheme(saved || (prefersDark?'dark':'light'));
+})();
+$('#btn-theme').onclick=()=>{ const cur=document.documentElement.getAttribute('data-theme'); const next=cur==='dark'?'light':'dark'; localStorage.setItem(THEME_KEY,next); applyTheme(next); };
+
+/* ========= Demo data + state ========= */
 const st = {
   notes: [],
   focusId: null
 };
-
-// ========= Dark Mode =========
-function setTheme(t) {
-  document.documentElement.setAttribute("data-theme", t);
-  localStorage.setItem("theme", t);
+function newNote(i){
+  return { id: 'n'+i, title: 'Note '+i, content: 'Text for note '+i, tags: i%3?['alpha','beta']:['alpha','gamma'], updated_at: new Date().toISOString() };
 }
-$("#btn-dark").addEventListener("click", () => {
-  const cur = document.documentElement.getAttribute("data-theme") || "light";
-  setTheme(cur === "light" ? "dark" : "light");
-});
-const savedTheme = localStorage.getItem("theme");
-if (savedTheme) setTheme(savedTheme);
-else if (window.matchMedia("(prefers-color-scheme: dark)").matches) setTheme("dark");
+if(!localStorage.getItem('wl_notes')){
+  st.notes = Array.from({length: 24}, (_,i)=>newNote(i));
+  localStorage.setItem('wl_notes', JSON.stringify(st.notes));
+} else {
+  st.notes = JSON.parse(localStorage.getItem('wl_notes')||'[]');
+}
+$('#count').textContent = st.notes.length;
 
-// ========= Import / Export =========
-$("#btn-export").addEventListener("click", () => {
+/* ========= Import / Export ========= */
+$('#btn-export').onclick = ()=>{
   const data = JSON.stringify({notes: st.notes}, null, 2);
-  const url = URL.createObjectURL(new Blob([data], {type:"application/json"}));
-  const a = document.createElement("a");
-  a.href = url; a.download = "willow_export.json"; a.click();
-  URL.revokeObjectURL(url);
-});
-$("#btn-import").addEventListener("click", () => {
-  const inp = document.createElement("input");
-  inp.type="file"; inp.accept="application/json";
-  inp.onchange = async e => {
-    const f = e.target.files[0]; if (!f) return;
-    const txt = await f.text();
-    const data = JSON.parse(txt);
-    st.notes = data.notes || [];
-    renderLibrary(); initPhysics();
+  const url = URL.createObjectURL(new Blob([data],{type:'application/json'}));
+  const a = document.createElement('a');
+  a.href = url; a.download = 'willow_export.json'; a.click();
+  setTimeout(()=>URL.revokeObjectURL(url), 500);
+};
+$('#btn-import').onclick = ()=>{
+  const inp=document.createElement('input'); inp.type='file'; inp.accept='application/json';
+  inp.onchange = async e=>{
+    const f=e.target.files[0]; if(!f) return;
+    try{
+      const text = await f.text();
+      const data = JSON.parse(text);
+      st.notes = Array.isArray(data)?data:(Array.isArray(data.notes)?data.notes:[]);
+      localStorage.setItem('wl_notes', JSON.stringify(st.notes));
+      renderLibrary(); initPhysics();
+    }catch{ alert('Invalid JSON.'); }
   };
   inp.click();
-});
+};
 
-// ========= Library =========
+/* ========= Library ========= */
 function renderLibrary(){
-  const div=$("#library");
-  div.innerHTML="";
-  st.notes
-    .slice()
-    .sort((a,b)=>(b.updated_at||"").localeCompare(a.updated_at||""))
+  const host = $('#library'); host.innerHTML='';
+  st.notes.slice().sort((a,b)=> (b.updated_at||'').localeCompare(a.updated_at||''))
     .forEach(n=>{
-      const d=document.createElement("div");
-      d.textContent=n.title||"(untitled)";
-      d.style.cursor="pointer";
+      const d=document.createElement('div'); d.className='item';
+      d.textContent=n.title || '(untitled)';
       d.onclick=()=>{ st.focusId=n.id; initPhysics(); };
-      div.appendChild(d);
+      host.appendChild(d);
     });
 }
+renderLibrary();
 
-// ========= Graph Physics =========
+/* ========= Graph (d3-force) ========= */
 let sim=null, nodes=[], links=[];
-const g={G:60,pad:6,linkBase:110,simW:1.0,focusPull:0.65};
-const canvas=$("#gcanvas"), ctx=canvas.getContext("2d");
-let transform={k:1,x:0,y:0};
-
-// Build graph data
-function dataForPhysics(){
-  // trivial: connect all notes randomly for demo
-  const nodeList=st.notes.map((n,i)=>({
-    id:n.id,title:n.title||"(untitled)",
-    r:10+Math.random()*5,
-    mass:1+Math.random()*2
-  }));
-  const linkList=[];
-  for(let i=0;i<nodeList.length;i++){
-    for(let j=i+1;j<nodeList.length;j++){
-      if(Math.random()<0.05) linkList.push({source:nodeList[i],target:nodeList[j],sim:Math.random()});
-    }
-  }
-  return {nodeList,linkList};
-}
+const g = { G: 60, pad: 6, linkBase: 110, focusPull: 0.65 };
+const canvas = $('#gcanvas'), ctx = canvas.getContext('2d');
+let transform = {k:1, x:0, y:0};
+let isDragging=false, dragNode=null;
 
 function resizeCanvas(){
-  const rect=canvas.parentElement.getBoundingClientRect();
-  canvas.width=rect.width*window.devicePixelRatio;
-  canvas.height=rect.height*window.devicePixelRatio;
-  ctx.setTransform(window.devicePixelRatio,0,0,window.devicePixelRatio,0,0);
+  const rect = canvas.getBoundingClientRect();
+  const dpr = window.devicePixelRatio||1;
+  canvas.width = Math.max(2, Math.floor(rect.width*dpr));
+  canvas.height = Math.max(2, Math.floor(rect.height*dpr));
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  draw();
 }
-window.addEventListener("resize",resizeCanvas);
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
+
+/* Build simple links using [[title]] in content (demo keeps it sparse) */
+function extractLinks(text){ const out=[]; if(!text) return out; const re=/\[\[([^\]]+)\]\]/g; let m; while((m=re.exec(text))!==null) out.push(m[1]); return out; }
+function buildGraph(){
+  const titleToId={}; st.notes.forEach(n=>{ if(n.title) titleToId[n.title]=n.id; });
+  const edges=[]; st.notes.forEach(n=> extractLinks(n.content).forEach(t=>{ const to=titleToId[t]; if(to && to!==n.id) edges.push({source:n.id, target:to}); }) );
+  return {edges};
+}
+function neighborsMap(edges){ const map={}; edges.forEach(e=>{ (map[e.source]=map[e.source]||new Set()).add(e.target); (map[e.target]=map[e.target]||new Set()).add(e.source); }); return map; }
+
+function dataForPhysics(){
+  const {edges} = buildGraph();
+  const focus = st.focusId;
+  const depth = +$('#depth').value;
+  $('#depthVal').textContent = depth;
+
+  let allowed = new Set(st.notes.map(n=>n.id));
+  if(focus){
+    const neigh = neighborsMap(edges);
+    allowed = new Set([focus]); let frontier=new Set([focus]);
+    for(let d=0; d<depth; d++){
+      const nxt=new Set();
+      frontier.forEach(v=> (neigh[v]||new Set()).forEach(u=>nxt.add(u)));
+      nxt.forEach(v=>allowed.add(v));
+      frontier=nxt;
+    }
+  }
+
+  const nodeList = st.notes
+    .filter(n=> allowed.has(n.id))
+    .map(n=>({ id:n.id, title:n.title||'(untitled)', r: 10, mass: 1 + Math.random()*1.5 }));
+
+  const idToNode = new Map(nodeList.map(n=>[n.id,n]));
+  const linkList = edges.filter(e=> idToNode.has(e.source) && idToNode.has(e.target))
+                        .map(e=> ({source:idToNode.get(e.source), target:idToNode.get(e.target)}));
+  return {nodeList, linkList};
+}
 
 function draw(){
-  ctx.save();
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-  ctx.translate(transform.x,transform.y);
-  ctx.scale(transform.k,transform.k);
+  const cs = getComputedStyle(document.documentElement);
+  const colEdge = cs.getPropertyValue('--g-edge').trim();
+  const colNode = cs.getPropertyValue('--g-node').trim();
+  const colFocus = cs.getPropertyValue('--g-focus').trim();
 
-  // links
-  ctx.strokeStyle="#888"; ctx.lineWidth=1/transform.k;
-  links.forEach(l=>{
-    ctx.beginPath(); ctx.moveTo(l.source.x,l.source.y);
-    ctx.lineTo(l.target.x,l.target.y); ctx.stroke();
-  });
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  ctx.save();
+  ctx.translate(transform.x, transform.y);
+  ctx.scale(transform.k, transform.k);
+
+  // edges
+  ctx.strokeStyle = colEdge;
+  ctx.lineWidth = 1.5/transform.k;
+  links.forEach(l=>{ ctx.beginPath(); ctx.moveTo(l.source.x, l.source.y); ctx.lineTo(l.target.x, l.target.y); ctx.stroke(); });
 
   // nodes
   nodes.forEach(n=>{
     ctx.beginPath();
-    ctx.fillStyle=(st.focusId===n.id)?"#e33":"#39f";
-    ctx.arc(n.x,n.y,n.r,0,2*Math.PI);
+    ctx.fillStyle = (st.focusId===n.id)? colFocus : colNode;
+    ctx.arc(n.x, n.y, n.r, 0, Math.PI*2);
     ctx.fill();
   });
 
   ctx.restore();
 }
 
-function initPhysics(){
-  const {nodeList,linkList}=dataForPhysics();
-  nodes=nodeList; links=linkList;
-  resizeCanvas();
-  if(sim) sim.stop();
-
-  sim=d3.forceSimulation(nodes)
-    .force("link", d3.forceLink(links).id(d=>d.id).distance(l=>g.linkBase*(1-l.sim)))
-    .force("charge", d3.forceManyBody().strength(d=>-30*d.mass))
-    .force("collide", d3.forceCollide().radius(d=>d.r+g.pad))
-    .force("center", d3.forceCenter(0,0))
-    .alpha(0.9)
-    .on("tick",draw);
+function toWorld(ev){
+  const rect=canvas.getBoundingClientRect();
+  const px = ev.clientX - rect.left;
+  const py = ev.clientY - rect.top;
+  return { x: (px - transform.x)/transform.k, y: (py - transform.y)/transform.k };
+}
+function nodeAt(x,y){
+  for(let i=nodes.length-1;i>=0;i--){
+    const n=nodes[i], dx=x-n.x, dy=y-n.y;
+    if(dx*dx+dy*dy <= (n.r+6)*(n.r+6)) return n;
+  }
+  return null;
 }
 
-// ========= Demo Data =========
-st.notes=[...Array(20)].map((_,i)=>({
-  id:"n"+i,title:"Note "+i,
-  updated_at:new Date().toISOString()
-}));
-renderLibrary();
+/* zoom/pan with wheel; drag empty space to pan */
+(function setupZoomPan(){
+  let panning=false, panStart=null, startTransform=null;
+  canvas.addEventListener('wheel', (ev)=>{
+    ev.preventDefault();
+    const scale = (ev.deltaY<0)? 1.1 : 0.9;
+    const rect=canvas.getBoundingClientRect();
+    const mx = ev.clientX - rect.left, my = ev.clientY - rect.top;
+    // zoom about mouse point
+    transform.x = mx + (transform.x - mx)*scale;
+    transform.y = my + (transform.y - my)*scale;
+    transform.k *= scale;
+    transform.k = Math.max(0.2, Math.min(6, transform.k));
+    draw();
+  }, {passive:false});
+
+  canvas.addEventListener('mousedown', (ev)=>{
+    const w = toWorld(ev);
+    const n = nodeAt(w.x, w.y);
+    if(n){ // drag node
+      isDragging=true; dragNode=n;
+      n.fx=n.x; n.fy=n.y;
+      if(sim) sim.alphaTarget(0.7).restart();
+    } else { // pan
+      panning=true; panStart={x:ev.clientX, y:ev.clientY}; startTransform={...transform};
+    }
+  });
+  window.addEventListener('mousemove', (ev)=>{
+    if(isDragging && dragNode){
+      const w = toWorld(ev);
+      dragNode.fx = w.x; dragNode.fy = w.y;
+      draw();
+      return;
+    }
+    if(panning){
+      transform.x = startTransform.x + (ev.clientX - panStart.x);
+      transform.y = startTransform.y + (ev.clientY - panStart.y);
+      draw();
+    }
+  });
+  window.addEventListener('mouseup', ()=>{
+    if(isDragging && dragNode){
+      dragNode.fx = null; dragNode.fy = null;  // release to physics
+      if(sim) sim.alphaTarget(0).restart();
+    }
+    isDragging=false; dragNode=null; panning=false;
+  });
+})();
+
+/* click to focus (filters by depth, recenters) */
+canvas.addEventListener('click', (ev)=>{
+  const w = toWorld(ev); const n = nodeAt(w.x, w.y);
+  if(n){
+    st.focusId = n.id;
+    initPhysics();
+  }
+});
+
+/* sliders */
+$('#linkBase').oninput = ()=>{ $('#linkBaseVal').textContent=$('#linkBase').value; if(sim){ sim.force('link').distance(+$('#linkBase').value); sim.alpha(0.3).restart(); } };
+$('#grav').oninput = ()=>{ $('#gravVal').textContent=$('#grav').value; if(sim){ sim.force('attract').strength(d=> +$('#grav').value * d.mass); sim.alpha(0.3).restart(); } };
+$('#pad').oninput = ()=>{ $('#padVal').textContent=$('#pad').value; if(sim){ sim.force('collide').radius(d=> d.r + +$('#pad').value + (st.focusId&&d.id===st.focusId? Math.max(2, +$('#pad').value*1.25):0)); sim.alpha(0.3).restart(); } };
+$('#depth').oninput = ()=>{ $('#depthVal').textContent=$('#depth').value; initPhysics(); };
+$('#btn-clear').onclick = ()=>{ st.focusId=null; initPhysics(); };
+$('#btn-recenter').onclick = ()=>{ const dpr=window.devicePixelRatio||1; const cx=(canvas.width/dpr)/2, cy=(canvas.height/dpr)/2; transform={k:1,x:cx,y:cy}; draw(); };
+
+/* init / rebuild physics */
+function initPhysics(){
+  const {nodeList, linkList} = dataForPhysics();
+  nodes = nodeList; links = linkList;
+
+  // center view
+  const dpr = window.devicePixelRatio||1;
+  const cx = (canvas.width/dpr)/2, cy=(canvas.height/dpr)/2;
+  transform = {k:1, x:cx, y:cy};
+
+  if(sim) sim.stop();
+
+  const linkBase = +$('#linkBase').value; $('#linkBaseVal').textContent=linkBase;
+  const grav = +$('#grav').value; $('#gravVal').textContent=grav;
+  const pad = +$('#pad').value; $('#padVal').textContent=pad;
+
+  const focus = st.focusId;
+
+  const fLink = d3.forceLink(links).id(d=>d.id).distance(linkBase).strength(0.08);
+  const fAttract = d3.forceManyBody().strength(d=> grav * d.mass).theta(0.9);
+  const fRepel = d3.forceManyBody().strength(d=> -20 * (1 + 0.3*d.mass));
+  const fCollide = d3.forceCollide().radius(d=> d.r + pad + ((focus && d.id===focus) ? Math.max(2, pad*1.25) : 0)).iterations(2);
+  const fFocus = d3.forceRadial(0,0,0).strength(d=> (focus && d.id===focus) ? 0.65 : 0);
+
+  sim = d3.forceSimulation(nodes)
+    .force('link', fLink)
+    .force('attract', fAttract)
+    .force('repel', fRepel)
+    .force('collide', fCollide)
+    .force('focus', fFocus)
+    .force('center', d3.forceCenter(0,0))
+    .velocityDecay(0.3)
+    .alpha(0.9)
+    .on('tick', draw);
+
+  draw();
+}
+
+/* boot */
 initPhysics();
 </script>
-<!-- d3.js -->
-<script src="https://d3js.org/d3.v7.min.js"></script>
 </body>
 </html>
