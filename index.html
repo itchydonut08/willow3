@@ -3,9 +3,12 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>Willow — Notecard • Library • Graph (Demo)</title>
+<title>Willow — Notecard • Library • Physics Graph (Demo)</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64'%3E%3Ctext y='50' font-size='48'%3E%F0%9F%8C%B2%3C/text%3E%3C/svg%3E">
-<script src="https://unpkg.com/cytoscape@3.30.3/dist/cytoscape.min.js"></script>
+
+<!-- d3 for physics -->
+<script src="https://unpkg.com/d3@7.9.0/dist/d3.min.js"></script>
+
 <style>
   :root{--ink:#222;--muted:#6b7280;--line:#e5e7eb;--bg:#f8fafc;--chip:#f3f4f6;--panel:#fff;--btn:#f9fafb}
   *{box-sizing:border-box} html,body{height:100%} html{scroll-behavior:smooth}
@@ -39,16 +42,18 @@
   .card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px;cursor:pointer;display:flex;flex-direction:column}
   .card .title{font-weight:700;font-size:13px;margin-bottom:6px}.card .preview{color:#6b7280;font-size:12px;flex:1}
   .card .meta{display:flex;gap:8px;color:#6b7280;font-size:11px;margin-top:6px}
-  #cy{height:520px;border:1px solid var(--line);border-radius:12px;background:#fff}
-  .controls{display:flex;gap:20px;align-items:center;margin-bottom:10px}.badge{border:1px solid var(--line);padding:2px 6px;border-radius:999px;font-size:11px;background:#f9fafb}
-  .cluster{display:grid;grid-template-columns:220px 1fr;gap:16px}.note-card{border:1px solid var(--line);border-radius:12px;background:#fff;padding:10px}
+  #gwrap{position:relative}
+  #gcanvas{width:100%;height:520px;border:1px solid var(--line);border-radius:12px;background:#fff;display:block}
+  .gctrls{display:flex;gap:14px;align-items:center;margin-bottom:10px;flex-wrap:wrap}
+  .badge{border:1px solid var(--line);padding:2px 6px;border-radius:999px;font-size:11px;background:#f9fafb}
   .footer{text-align:center;color:#9ca3af;font-size:12px;margin-top:12px}
+  .tooltip{position:absolute;pointer-events:none;background:#111;color:#fff;padding:6px 8px;border-radius:8px;font-size:12px;opacity:0;transition:opacity .15s}
 </style>
 </head>
 <body>
 <header>
   <div class="title">
-    <h1>Willow</h1><span class="muted">Notecard • Library • Graph</span>
+    <h1>Willow</h1><span class="muted">Notecard • Library • Physics Graph</span>
   </div>
   <nav class="nav">
     <a href="#/notecard" id="nav-notecard" class="active">Notecard</a>
@@ -119,25 +124,50 @@
     </div>
   </section>
 
-  <!-- Graph -->
+  <!-- Physics Graph -->
   <section id="view-graph" style="display:none">
     <div class="pane">
-      <h3 style="margin:0 0 8px">GRAPH</h3>
-      <div class="controls">
-        <div><span class="muted">Breadth</span> <input id="gr-breadth" type="range" min="0" max="10" step="1" value="0"> <span id="gr-breadth-val" class="badge">0</span></div>
-        <div><span class="muted">Depth</span> <input id="gr-depth" type="range" min="1" max="6" step="1" value="6"> <span id="gr-depth-val" class="badge">6</span></div>
+      <h3 style="margin:0 0 8px">GRAPH (Physics)</h3>
+      <div class="gctrls">
+        <span class="muted">Breadth (min degree)</span>
+        <input id="gr-breadth" type="range" min="0" max="10" step="1" value="0">
+        <span id="gr-breadth-val" class="badge">0</span>
+
+        <span class="muted">Depth (hops from focus)</span>
+        <input id="gr-depth" type="range" min="1" max="6" step="1" value="6">
+        <span id="gr-depth-val" class="badge">6</span>
+
+        <span class="muted">G (attraction)</span>
+        <input id="gr-G" type="range" min="0" max="200" step="5" value="60">
+        <span id="gr-G-val" class="badge">60</span>
+
+        <span class="muted">Collision +padding</span>
+        <input id="gr-pad" type="range" min="0" max="20" step="1" value="6">
+        <span id="gr-pad-val" class="badge">6</span>
+
+        <span class="muted">Link spring</span>
+        <input id="gr-link" type="range" min="30" max="200" step="5" value="110">
+        <span id="gr-link-val" class="badge">110</span>
+
         <button id="gr-reset-focus" class="btn">Clear focus</button>
+        <button id="gr-pause" class="btn">Pause</button>
+        <button id="gr-reheat" class="btn">Reheat</button>
       </div>
-      <div id="cy"></div>
+      <div id="gwrap">
+        <canvas id="gcanvas" width="1000" height="520"></canvas>
+        <div id="gtooltip" class="tooltip"></div>
+      </div>
+      <div class="muted" style="margin-top:8px">Tip: click a node to select (focus) and populate the Card Cluster below.</div>
     </div>
+
     <div class="pane" id="cluster-pane" style="margin-top:16px">
       <div class="row space">
         <h3 style="margin:0">GRAPH: Card Cluster</h3>
         <div class="row"><span class="muted">Card size</span><input id="cl-size" type="range" min="160" max="320" step="10" value="220"><span class="muted">Depth</span><input id="cl-depth" type="range" min="1" max="5" step="1" value="1"></div>
       </div>
-      <div class="cluster">
+      <div class="grid-3" style="grid-template-columns:220px 1fr;gap:16px">
         <aside><div class="muted">Focus Note</div><div id="cl-focus" class="note-card"></div><div class="muted" style="margin:8px 0">Linked notes</div><div id="cl-links" class="mono" style="font-size:12px"></div></aside>
-        <section id="cl-canvas" class="cluster-canvas"></section>
+        <section id="cl-canvas" style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-start"></section>
       </div>
     </div>
   </section>
@@ -146,8 +176,8 @@
 </main>
 
 <script>
-/*** ===== Demo-only: your OpenAI API key (exposed) ===== ***/
-const OPENAI_KEY = "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";
+/*** ===== Demo-only: API key baked in (exposed) ===== ***/
+const OPENAI_KEY = "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";
 
 /* ---------- Helpers ---------- */
 const $=s=>document.querySelector(s), $$=s=>Array.from(document.querySelectorAll(s));
@@ -158,15 +188,18 @@ const oneSentence=s=>{s=(s||'').replace(/\s+/g,' ').trim();const i=s.indexOf('.'
 const tagsOf=s=>(s||'').split(',').map(x=>x.trim().replace(/^#/,'')).filter(Boolean);
 
 /* ---------- Global state ---------- */
-let cy=null; // important: declared before router may call renderGraph()
 const st={ notes: JSON.parse(localStorage.getItem('wl_notes')||'[]'), focusId: localStorage.getItem('wl_focusId')||null, projFilter: localStorage.getItem('wl_proj')||null, prompts:{} };
 const persist=()=>{ localStorage.setItem('wl_notes', JSON.stringify(st.notes)); localStorage.setItem('wl_focusId', st.focusId||''); localStorage.setItem('wl_proj', st.projFilter||''); };
 
-/* ---------- Graph helpers ---------- */
-function wlExtract(text){const out=[];if(!text)return out;const re=/\[\[([^\]]+)\]\]/g;let m;while((m=re.exec(text))!==null)out.push(m[1].trim());return out;}
-function wlBuild(){const t2i={};st.notes.forEach(n=>{if(n.title)t2i[n.title]=n.id});const edges=[];st.notes.forEach(n=>wlExtract(n.content).forEach(t=>{const to=t2i[t];if(to&&to!==n.id)edges.push({from:n.id,to})}));return {edges};}
-const wlDeg=E=>{const d={};E.forEach(e=>{d[e.from]=(d[e.from]||0)+1;d[e.to]=(d[e.to]||0)+1});return d;}
-const wlNeigh=E=>{const m={};E.forEach(e=>{(m[e.from]=m[e.from]||new Set()).add(e.to);(m[e.to]=m[e.to]||new Set()).add(e.from)});return m;}
+/* ---------- Graph helpers (shared) ---------- */
+function extractLinks(text){const out=[];if(!text)return out;const re=/\[\[([^\]]+)\]\]/g;let m;while((m=re.exec(text))!==null)out.push(m[1].trim());return out;}
+function buildGraph(){
+  const titleToId={}; st.notes.forEach(n=>{ if(n.title) titleToId[n.title]=n.id; });
+  const edges=[]; st.notes.forEach(n=>{ extractLinks(n.content).forEach(t=>{ const to=titleToId[t]; if(to && to!==n.id) edges.push({source:n.id,target:to}); }); });
+  return {edges};
+}
+function degreeMap(edges){const d={}; edges.forEach(e=>{ d[e.source]=(d[e.source]||0)+1; d[e.target]=(d[e.target]||0)+1; }); return d; }
+function neighborsMap(edges){const map={}; edges.forEach(e=>{ (map[e.source]=map[e.source]||new Set()).add(e.target); (map[e.target]=map[e.target]||new Set()).add(e.source); }); return map; }
 
 /* ---------- Router ---------- */
 function show(h){h=h||location.hash||'#/notecard';
@@ -177,7 +210,7 @@ function show(h){h=h||location.hash||'#/notecard';
   $('#view-library').style.display=h==='#/library'?'':'none';
   $('#view-graph').style.display=h==='#/graph'?'':'none';
   if(h==='#/library'){renderProjectsBar();renderLibrary();}
-  if(h==='#/graph'){renderGraph();renderCluster();}
+  if(h==='#/graph'){initPhysics(); renderCluster();}
 }
 addEventListener('hashchange',()=>show()); show();
 
@@ -196,25 +229,25 @@ $('#tab-suggestions').onclick=()=>{leftMode='suggestions';$('#tab-suggestions').
 function chipTags(){const t=tagsOf($('#nc-tags').value);$('#tag-chips').innerHTML=t.map(x=>`<span class="chip">#${esc(x)}</span>`).join('');}
 $('#nc-tags').oninput=chipTags;
 
-function load(id){const n=st.notes.find(x=>x.id===id);if(!n)return;currentId=id;$('#nc-title').value=n.title||'';$('#nc-content').value=n.content||'';$('#nc-tags').value=(n.tags||[]).join(', ');chipTags();}
+function load(id){const n=st.notes.find(x=>x.id===id);if(!n)return;currentId=id;st.focusId=id;persist();$('#nc-title').value=n.title||'';$('#nc-content').value=n.content||'';$('#nc-tags').value=(n.tags||[]).join(', ');chipTags();}
 const draft=()=>({id:currentId||uid(),title:$('#nc-title').value.trim(),content:$('#nc-content').value,tags:tagsOf($('#nc-tags').value)});
 $('#btn-new-note').onclick=()=>{currentId=null;$('#nc-title').value='';$('#nc-content').value='';$('#nc-tags').value='';chipTags();}
 $('#btn-save-note').onclick=()=>{const n=draft();if(!n.title){alert('Title, please.');return;}const i=st.notes.findIndex(x=>x.id===n.id);const t=now();if(i>=0)st.notes[i]={...st.notes[i],...n,updated_at:t};else st.notes.push({...n,created_at:t,updated_at:t,debate:[]});persist();renderLeft();alert('Saved.');};
 $('#file-attach').onchange=e=>{const f=e.target.files[0];if(!f)return;if(!currentId){alert('Save the note first, then attach.');return;}const i=st.notes.findIndex(x=>x.id===currentId);st.notes[i].file={name:f.name,size:f.size,type:f.type};persist();alert('Attached (metadata only).');};
 
-/* suggestions (simple heuristic) */
-function suggestFor(n){const {edges}=wlBuild();const deg=wlDeg(edges);const kw=new Set((n.title||'').toLowerCase().split(/\W+/).filter(x=>x.length>3));const out=[];
+/* suggestions */
+function suggestFor(n){const {edges}=buildGraph();const deg=degreeMap(edges);const kw=new Set((n.title||'').toLowerCase().split(/\W+/).filter(x=>x.length>3));const out=[];
   st.notes.forEach(m=>{if(!m.title||m.id===n.id)return;const tagO=(m.tags||[]).filter(t=>(n.tags||[]).includes(t));
     const wordO=(m.title||'').toLowerCase().split(/\W+/).filter(x=>x.length>3&&kw.has(x));
     const score=tagO.length*2+wordO.length+(deg[m.id]||0)*0.1;if(score>0)out.push({id:m.id,title:m.title,reason:`Tags:${tagO.join(',')||'—'} Words:${wordO.join(',')||'—'} Links:${deg[m.id]||0}`});});
-  out.sort((a,b)=>b.reason.length-a.reason.length);return out.slice(0,12);
+  out.sort((a,b)=> b.reason.length-a.reason.length); return out.slice(0,12);
 }
 function renderSuggestions(){const host=$('#suggested');host.innerHTML='';const items=suggestFor(draft());if(items.length===0){host.innerHTML='<div class="muted">No suggestions yet.</div>';return;}
   items.forEach(s=>{const d=document.createElement('div');d.className='sugg-item';d.innerHTML=`<b>${esc(s.title)}</b><div class="muted">${esc(s.reason)}</div>`;d.onclick=()=>{const ta=$('#nc-content');const txt=`[[${s.title}]]`;const p=ta.selectionStart||ta.value.length;ta.value=ta.value.slice(0,p)+txt+ta.value.slice(p);ta.selectionStart=ta.selectionEnd=p+txt.length;ta.focus();};host.appendChild(d);});
 }
 $('#btn-run-suggest').onclick=renderSuggestions;
 
-/* ---------- Prompts: load from prompts.json, else use inline defaults ---------- */
+/* ---------- Agents (prompts) ---------- */
 const defaultPrompts = {
   "Historian": {"system":"You are a meticulous historian. Provide context and precedents.","user":"Note title: {title}\nNote text:\n{text}\nWrite 1–2 tight paragraphs with parallels and what to watch.","temperature":0.6,"model":"gpt-4o-mini"},
   "Economist": {"system":"You are a pragmatic macroeconomist. Quantify where possible.","user":"Given the note “{title}”:\n{text}\nReturn bullets for mechanisms, data to check, and a base/alt scenario.","temperature":0.5,"model":"gpt-4o-mini"},
@@ -223,16 +256,11 @@ const defaultPrompts = {
   "Interconnectedness": {"system":"Map second- and third-order links across domains.","user":"Note “{title}”:\n{text}\nGive a compact map of 2nd/3rd-order effects and which prior notes to link to (just titles).","temperature":0.6}
 };
 async function loadPrompts(){
-  try{
-    const res = await fetch('prompts.json', {cache:'no-store'});
-    if(res.ok){ st.prompts = await res.json(); return; }
-  }catch(e){}
-  st.prompts = defaultPrompts;
+  try{const res=await fetch('prompts.json',{cache:'no-store'}); st.prompts = res.ok? await res.json() : defaultPrompts;}
+  catch{st.prompts = defaultPrompts;}
 }
 loadPrompts();
 
-/* ---------- Ask AI (browser → OpenAI) ---------- */
-/* NOTE: This works only if your browser environment permits CORS to api.openai.com. */
 async function askAgent(){
   const agentKey=$('#debate-agent').value;
   const P=st.prompts[agentKey]||defaultPrompts[agentKey]||defaultPrompts.Historian;
@@ -252,12 +280,10 @@ async function askAgent(){
       headers:{'Content-Type':'application/json','Authorization':'Bearer '+OPENAI_KEY},
       body:JSON.stringify(body)
     });
-    if(!r.ok){ throw new Error(await r.text()); }
+    if(!r.ok) throw new Error(await r.text());
     const data=await r.json();
     $('#debate-output').textContent = data.choices?.[0]?.message?.content || '(no text)';
-  }catch(err){
-    $('#debate-output').textContent='Agent error: '+err.message+'\n(If this is a CORS error, it won’t work from a static page without a proxy.)';
-  }
+  }catch(err){ $('#debate-output').textContent='Agent error: '+err.message; }
 }
 $('#debate-ask').onclick=askAgent;
 $('#debate-add').onclick=()=>{const t=$('#debate-output').textContent.trim(); if(!t){alert('Ask AI first, or type something.');return;} const n=st.notes.find(x=>x.id===currentId); if(!n){alert('Save the note first.');return;} n.debate=n.debate||[]; n.debate.push({who:$('#debate-agent').value,text:t,at:now()}); n.updated_at=now(); persist(); alert('Added to note.'); };
@@ -276,7 +302,7 @@ function renderProjectsBar(){const bar=$('#projects-bar');bar.innerHTML='';const
 function renderLibrary(){
   $('#lib-min-links-val').textContent=$('#lib-min-links').value;
   const size=+$('#lib-size').value, search=$('#lib-search').value.toLowerCase(), tags=tagsOf($('#lib-tag-filter').value);
-  const {edges}=wlBuild(); const deg=wlDeg(edges);
+  const {edges}=buildGraph(); const deg=degreeMap(edges);
   let items=st.notes.slice();
   if(st.projFilter){const set=new Set(projectsMap()[st.projFilter]||[]);items=items.filter(n=>set.has(n.id));}
   if(search) items=items.filter(n=>(n.title||'').toLowerCase().includes(search)||(n.content||'').toLowerCase().includes(search));
@@ -293,42 +319,201 @@ $('#lib-sort').onchange=renderLibrary;
 $('#lib-clear').onclick=()=>{st.projFilter=null;$('#lib-active-project').style.display='none';$('#lib-search').value='';$('#lib-tag-filter').value='';$('#lib-min-links').value='0';$('#lib-min-links-val').textContent='0';persist();renderProjectsBar();renderLibrary();};
 $('#lib-active-project').onclick=()=>{$('#lib-clear').click();};
 
-/* ---------- Graph (COSE layout with spacing) ---------- */
-function coseLayout(){return {name:'cose',animate:'end',animationDuration:400,nodeRepulsion:8000,nodeOverlap:20,idealEdgeLength:120,edgeElasticity:0.1,gravity:80,numIter:1000,padding:30,componentSpacing:120,coolingFactor:0.95,minTemp:1}}
-function renderGraph(){
-  $('#gr-breadth-val').textContent=$('#gr-breadth').value; $('#gr-depth-val').textContent=$('#gr-depth').value;
-  const {edges}=wlBuild(); const deg=wlDeg(edges), breadth=+$('#gr-breadth').value, focus=st.focusId, depth=+$('#gr-depth').value;
-  let allowed=new Set(st.notes.map(n=>n.id));
-  if(focus){const N=wlNeigh(edges);allowed=new Set([focus]);let F=new Set([focus]);for(let d=0;d<depth;d++){const nx=new Set();F.forEach(v=>(N[v]||new Set()).forEach(u=>nx.add(u)));nx.forEach(v=>allowed.add(v));F=nx;}}
-  const nodes=st.notes.filter(n=>allowed.has(n.id)&&(deg[n.id]||0)>=breadth);
-  const els=[]; nodes.forEach(n=>els.push({data:{id:n.id,label:n.title||'(untitled)',degree:deg[n.id]||0}}));
-  edges.forEach(e=>{if(nodes.find(x=>x.id===e.from)&&nodes.find(x=>x.id===e.to))els.push({data:{id:e.from+'_'+e.to,source:e.from,target:e.to}})});
-  if(!cy){cy=cytoscape({container:$('#cy'),elements:els,style:[
-      {selector:'node',style:{'label':'data(label)','text-wrap':'wrap','text-max-width':160,'font-size':10,'background-color':'#0ea5e9','color':'#0f172a','width':'mapData(degree,0,12,20,60)','height':'mapData(degree,0,12,20,60)','border-width':2,'border-color':'#0f172a'}},
-      {selector:'edge',style:{'width':2,'line-color':'#cbd5e1','target-arrow-shape':'triangle','target-arrow-color':'#cbd5e1','curve-style':'bezier'}},
-      {selector:':selected',style:{'border-color':'#111827','border-width':4}}
-    ], layout:coseLayout()});
-    cy.on('tap','node',ev=>{st.focusId=ev.target.id();persist();renderCluster();$('#cluster-pane').scrollIntoView({behavior:'smooth',block:'center'});});
-  } else {cy.json({elements:els}); cy.layout(coseLayout()).run();}
-}
-$('#gr-breadth').oninput=renderGraph; $('#gr-depth').oninput=renderGraph; $('#gr-reset-focus').onclick=()=>{st.focusId=null;persist();renderGraph();renderCluster();};
+/* ===================== Physics Graph (d3-force) ===================== */
+let sim=null, nodes=[], links=[];
+const g = { // controls
+  G: 60, pad: 6, linkDist: 110, paused:false
+};
+const canvas = $('#gcanvas'), ctx = canvas.getContext('2d');
+const tooltip = $('#gtooltip');
 
-/* ---------- Card cluster ---------- */
+function resizeCanvas(){
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * (window.devicePixelRatio||1);
+  canvas.height = rect.height * (window.devicePixelRatio||1);
+  ctx.setTransform(window.devicePixelRatio||1,0,0,window.devicePixelRatio||1,0,0);
+}
+window.addEventListener('resize', ()=>{ resizeCanvas(); if(sim) sim.alpha(0.3).restart(); });
+
+function dataForPhysics(){
+  const {edges}=buildGraph(); const deg=degreeMap(edges);
+  const breadth=+$('#gr-breadth').value; const focus=st.focusId; const depth=+$('#gr-depth').value;
+  $('#gr-breadth-val').textContent=breadth; $('#gr-depth-val').textContent=depth;
+
+  let allowed=new Set(st.notes.map(n=>n.id));
+  if(focus){
+    const neigh=neighborsMap(edges);
+    allowed=new Set([focus]); let frontier=new Set([focus]);
+    for(let d=0; d<depth; d++){ const nxt=new Set(); frontier.forEach(v=> (neigh[v]||new Set()).forEach(u=>nxt.add(u))); nxt.forEach(v=>allowed.add(v)); frontier=nxt; }
+  }
+  const nodeList = st.notes.filter(n=> allowed.has(n.id) && (deg[n.id]||0)>=breadth)
+    .map(n=>{
+      const k = deg[n.id]||0;
+      const mass = 1 + Math.sqrt(k);     // heavier if more connections
+      const r = 10 + k*2;                 // visual radius
+      return { id:n.id, title:n.title||'(untitled)', degree:k, mass, r, tags:n.tags||[] };
+    });
+
+  const ids = new Set(nodeList.map(n=>n.id));
+  const linkList = edges.filter(e=> ids.has(e.source) && ids.has(e.target))
+    .map(e=>({source:e.source,target:e.target, w:1}));
+
+  return {nodeList, linkList};
+}
+
+function draw(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  // Edges
+  ctx.lineWidth = 1.5; ctx.strokeStyle = '#cbd5e1';
+  links.forEach(l=>{ ctx.beginPath(); ctx.moveTo(l.source.x, l.source.y); ctx.lineTo(l.target.x, l.target.y); ctx.stroke(); });
+
+  // Nodes
+  nodes.forEach(n=>{
+    // node circle
+    ctx.beginPath();
+    ctx.fillStyle = '#0ea5e9';
+    ctx.strokeStyle = '#0f172a';
+    ctx.lineWidth = 2;
+    ctx.arc(n.x, n.y, n.r, 0, Math.PI*2);
+    ctx.fill(); ctx.stroke();
+    // label
+    ctx.fillStyle='#0f172a';
+    ctx.font='10px system-ui, sans-serif';
+    const maxW = 160;
+    const text = n.title.length>34 ? n.title.slice(0,34)+'…' : n.title;
+    ctx.fillText(text, n.x - Math.min(ctx.measureText(text).width/2, maxW/2), n.y - n.r - 6);
+  });
+}
+
+function initPhysics(){
+  // read controls
+  g.G = +$('#gr-G').value; $('#gr-G-val').textContent=g.G;
+  g.pad = +$('#gr-pad').value; $('#gr-pad-val').textContent=g.pad;
+  g.linkDist = +$('#gr-link').value; $('#gr-link-val').textContent=g.linkDist;
+
+  const {nodeList, linkList} = dataForPhysics();
+  nodes = nodeList;
+  links = linkList;
+
+  resizeCanvas();
+
+  if(sim) sim.stop();
+
+  // Link force (springs)
+  const fLink = d3.forceLink(links)
+    .id(d=>d.id)
+    .distance(d => g.linkDist + 4* ( (d.source.degree||0)+(d.target.degree||0) )/2 )
+    .strength(0.08);
+
+  // Gravity-like attraction (positive many-body) scaled by mass
+  const fAttract = d3.forceManyBody()
+    .strength(d => +g.G * d.mass)           // attraction ~ mass
+    .theta(0.9);
+
+  // Collision boundary per node (invisible padding)
+  const fCollide = d3.forceCollide().radius(d => d.r + g.pad).iterations(2);
+
+  // Mild repulsion to avoid collapsed clumps (small negative)
+  const fRepel = d3.forceManyBody().strength(d => -20 * (1 + 0.3*d.mass));
+
+  // Drag to slow the system
+  const velocityDecay = 0.3;
+
+  sim = d3.forceSimulation(nodes)
+    .force('link', fLink)
+    .force('attract', fAttract)
+    .force('repel', fRepel)
+    .force('collide', fCollide)
+    .force('center', d3.forceCenter(canvas.width/2, canvas.height/2))
+    .velocityDecay(velocityDecay)
+    .alpha(0.9)
+    .on('tick', draw);
+
+  // Interaction (click select)
+  canvas.onmousemove = handleHover;
+  canvas.onclick = handleClick;
+
+  // Pause state
+  if(g.paused) sim.stop();
+  draw();
+}
+
+function nodeAt(x,y){
+  // pick topmost node under pointer
+  for(let i=nodes.length-1;i>=0;i--){
+    const n=nodes[i];
+    const dx=x-n.x, dy=y-n.y;
+    if(dx*dx+dy*dy <= (n.r+6)*(n.r+6)) return n; // include some tolerance
+  }
+  return null;
+}
+function handleHover(ev){
+  const rect = canvas.getBoundingClientRect();
+  const x = (ev.clientX - rect.left) * (canvas.width/rect.width);
+  const y = (ev.clientY - rect.top) * (canvas.height/rect.height);
+  const n = nodeAt(x,y);
+  if(n){
+    tooltip.style.opacity=1;
+    tooltip.style.left = (ev.clientX+12)+'px';
+    tooltip.style.top = (ev.clientY+12)+'px';
+    tooltip.textContent = `${n.title}  ·  deg ${n.degree}`;
+    canvas.style.cursor='pointer';
+  }else{
+    tooltip.style.opacity=0;
+    canvas.style.cursor='default';
+  }
+}
+function handleClick(ev){
+  const rect = canvas.getBoundingClientRect();
+  const x = (ev.clientX - rect.left) * (canvas.width/rect.width);
+  const y = (ev.clientY - rect.top) * (canvas.height/rect.height);
+  const n = nodeAt(x,y);
+  if(n){
+    st.focusId = n.id; persist();
+    renderCluster();
+  }
+}
+
+// controls wiring
+$('#gr-G').oninput = ()=>{ $('#gr-G-val').textContent=$('#gr-G').value; g.G=+$('#gr-G').value; if(sim){ sim.force('attract').strength(d=>+g.G*d.mass); sim.alpha(0.3).restart(); }};
+$('#gr-pad').oninput = ()=>{ $('#gr-pad-val').textContent=$('#gr-pad').value; g.pad=+$('#gr-pad').value; if(sim){ sim.force('collide').radius(d=>d.r+g.pad); sim.alpha(0.3).restart(); }};
+$('#gr-link').oninput = ()=>{ $('#gr-link-val').textContent=$('#gr-link').value; g.linkDist=+$('#gr-link').value; if(sim){ sim.force('link').distance(d=>g.linkDist + 4*((d.source.degree||0)+(d.target.degree||0))/2); sim.alpha(0.3).restart(); }};
+$('#gr-breadth').oninput = ()=>{ initPhysics(); };
+$('#gr-depth').oninput = ()=>{ initPhysics(); };
+$('#gr-reset-focus').onclick = ()=>{ st.focusId=null; persist(); initPhysics(); renderCluster(); };
+$('#gr-pause').onclick = ()=>{ g.paused=!g.paused; if(g.paused){ sim.stop(); $('#gr-pause').textContent='Resume'; }else{ sim.alpha(0.4).restart(); $('#gr-pause').textContent='Pause'; }};
+$('#gr-reheat').onclick = ()=>{ if(sim){ sim.alpha(0.9).restart(); }};
+
+/* ---------- Card Cluster (uses focusId) ---------- */
 function renderCluster(){
-  const size=+$('#cl-size').value, depth=+$('#cl-depth').value, focus=st.focusId; const focusNote=st.notes.find(n=>n.id===focus);
+  const size=+$('#cl-size').value, depth=+$('#cl-depth').value, focus=st.focusId; 
+  const {edges}=buildGraph(); const neigh=neighborsMap(edges);
+  const focusNote=st.notes.find(n=>n.id===focus);
   $('#cl-focus').innerHTML=focusNote?`<div style="font-weight:700">${esc(focusNote.title||'(untitled)')}</div><div class="mono" style="white-space:pre-wrap">${esc((focusNote.content||'').slice(0,220))}${(focusNote.content||'').length>220?'…':''}</div><div class="chips" style="margin-top:6px">${(focusNote.tags||[]).map(t=>`<span class="chip">#${esc(t)}</span>`).join('')}</div>`:'<div class="muted">No focus selected.</div>';
-  const {edges}=wlBuild(); const N=wlNeigh(edges); const canvas=$('#cl-canvas'); canvas.innerHTML=''; $('#cl-links').textContent='';
-  if(!focusNote)return; const seen=new Set([focus]); let F=new Set([focus]); const lvl={[focus]:0}; for(let d=0;d<depth;d++){const nx=new Set();F.forEach(v=>(N[v]||new Set()).forEach(u=>{if(!seen.has(u)){seen.add(u);nx.add(u);lvl[u]=d+1}}));F=nx;}
-  seen.delete(focus); $('#cl-links').textContent=Array.from(seen).map(id=>`• (${lvl[id]}) ${st.notes.find(x=>x.id===id)?.title||id}`).join('\n');
-  Array.from(seen).forEach(id=>{const n=st.notes.find(x=>x.id===id);if(!n)return;const card=document.createElement('article');card.className='note-card';card.style.width=size+'px';card.innerHTML=`<div style="font-weight:700">${esc(n.title||'(untitled)')}</div><div class="mono" style="white-space:pre-wrap">${esc((n.content||'').slice(0,160))}${(n.content||'').length>160?'…':''}</div><div class="chips" style="margin-top:6px">${(n.tags||[]).map(t=>`<span class="chip">#${esc(t)}</span>`).join('')}</div><div class="row" style="margin-top:6px"><button class="btn" data-open="${n.id}">Open</button><button class="btn" data-link="${n.title}">[[Link]]</button></div>`; canvas.appendChild(card);});
-  $$('[data-open]').forEach(b=>b.onclick=()=>{const id=b.getAttribute('data-open');location.hash='#/notecard';load(id);renderLeft();});
-  $$('[data-link]').forEach(b=>b.onclick=()=>{const title=b.getAttribute('data-link');location.hash='#/notecard';const ta=$('#nc-content');const txt=`[[${title}]]`;const p=ta.selectionStart||ta.value.length;ta.value=ta.value.slice(0,p)+txt+ta.value.slice(p);ta.selectionStart=ta.selectionEnd=p+txt.length;ta.focus();});
+  const canvas=$('#cl-canvas'); canvas.innerHTML=''; $('#cl-links').textContent='';
+  if(!focusNote) return;
+
+  const seen=new Set([focus]); let frontier=new Set([focus]); const levels={[focus]:0};
+  for(let d=0; d<depth; d++){ const nxt=new Set(); frontier.forEach(v=> (neigh[v]||new Set()).forEach(u=>{ if(!seen.has(u)){ seen.add(u); nxt.add(u); levels[u]=d+1; } })); frontier=nxt; }
+  seen.delete(focus);
+  $('#cl-links').textContent=Array.from(seen).map(id=>`• (${levels[id]}) ${st.notes.find(x=>x.id===id)?.title||id}`).join('\n');
+
+  Array.from(seen).forEach(id=>{ const n=st.notes.find(x=>x.id===id); if(!n) return; const card=document.createElement('article'); card.className='note-card'; card.style.width=size+'px'; card.innerHTML=`
+      <div style="font-weight:700">${esc(n.title||'(untitled)')}</div>
+      <div class="mono" style="white-space:pre-wrap">${esc((n.content||'').slice(0,160))}${(n.content||'').length>160?'…':''}</div>
+      <div class="chips" style="margin-top:6px">${(n.tags||[]).map(t=>`<span class="chip">#${esc(t)}</span>`).join('')}</div>
+      <div class="row" style="margin-top:6px">
+        <button class="btn" data-open="${n.id}">Open</button>
+        <button class="btn" data-link="${n.title}">[[Link]]</button>
+      </div>`; canvas.appendChild(card); });
+  $$('[data-open]').forEach(b=> b.onclick=()=>{ const id=b.getAttribute('data-open'); location.hash='#/notecard'; load(id); renderLeft(); });
+  $$('[data-link]').forEach(b=> b.onclick=()=>{ const title=b.getAttribute('data-link'); location.hash='#/notecard'; const ta=$('#nc-content'); const txt=`[[${title}]]`; const p=ta.selectionStart||ta.value.length; ta.value=ta.value.slice(0,p)+txt+ta.value.slice(p); ta.selectionStart=ta.selectionEnd=p+txt.length; ta.focus(); });
 }
 $('#cl-size').oninput=renderCluster; $('#cl-depth').oninput=renderCluster;
 
 /* ---------- Import/Export ---------- */
 $('#btn-export').onclick=()=>{const data=JSON.stringify({notes:st.notes},null,2);const url=URL.createObjectURL(new Blob([data],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download='willow_export.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),500);};
-$('#file-import').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const text=await f.text();const data=JSON.parse(text);st.notes=Array.isArray(data)?data:(Array.isArray(data.notes)?data.notes:[]);persist();alert('Imported.');renderLeft();renderProjectsBar();renderLibrary();renderGraph();renderCluster();}catch{alert('Invalid JSON.');}};
+$('#file-import').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const text=await f.text();const data=JSON.parse(text);st.notes=Array.isArray(data)?data:(Array.isArray(data.notes)?data.notes:[]);persist();alert('Imported.');renderLeft();renderProjectsBar();renderLibrary();initPhysics();renderCluster();}catch{alert('Invalid JSON.');}};
 
 /* ---------- Boot demo if empty ---------- */
 if(st.notes.length===0){const A={id:uid(),title:'Bank Funding Stress',content:'Deposits → MMFs. [[CRE Exposures]] [[Regional Banks]]',tags:['banking','risk','project:Atlas'],created_at:now(),updated_at:now(),debate:[]};
@@ -337,7 +522,7 @@ if(st.notes.length===0){const A={id:uid(),title:'Bank Funding Stress',content:'D
   const D={id:uid(),title:'Regional Banks',content:'Unrealized losses + deposit flight. [[Bank Funding Stress]]',tags:['banking','project:Drift'],created_at:now(),updated_at:now(),debate:[]};
   st.notes.push(A,B,C,D); persist();
 }
-renderLeft();
+renderLeft(); renderProjectsBar(); renderLibrary();
 </script>
 </body>
 </html>
