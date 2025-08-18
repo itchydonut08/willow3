@@ -5,7 +5,9 @@
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <title>Willow — Notecard • Library • Graph</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64'%3E%3Ctext y='50' font-size='48'%3E%F0%9F%8C%B2%3C/text%3E%3C/svg%3E">
+<!-- Cytoscape core + non-overlapping layout -->
 <script src="https://unpkg.com/cytoscape@3.30.3/dist/cytoscape.min.js"></script>
+<script src="https://unpkg.com/cytoscape-cose-bilkent@4.1.0/cytoscape-cose-bilkent.js"></script>
 <style>
   :root{
     --ink:#222; --muted:#6b7280; --line:#e5e7eb; --bg:#f8fafc; --chip:#f3f4f6;
@@ -13,7 +15,7 @@
   }
   *{box-sizing:border-box}
   html,body{height:100%}
-  html{scroll-behavior:smooth} /* smoother scrolling */
+  html{scroll-behavior:smooth}
   body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,"Noto Sans",sans-serif}
   header{padding:12px 20px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;background:#fff;position:sticky;top:0;z-index:5}
   .title{display:flex;gap:10px;align-items:baseline}
@@ -87,7 +89,6 @@
     <label class="btn" style="cursor:pointer">
       <input id="file-import" type="file" accept="application/json" style="display:none"> Import
     </label>
-    <button id="btn-example" class="btn">Example Import</button>
   </nav>
 </header>
 
@@ -160,7 +161,7 @@ This reminds me of ...
   <section id="view-library" class="lib" style="display:none">
     <aside class="pane">
       <h3 style="margin:0 0 8px 0">LIBRARY</h3>
-      <div class="muted" style="margin-bottom:6px">Projects</div>
+      <div class="muted" style="margin-bottom:6px">Projects (click a folder to open)</div>
       <div id="folders" class="folders"></div>
 
       <div class="divider"></div>
@@ -249,9 +250,9 @@ const tokenizeTags = s => (s||'').split(',').map(x=>x.trim().replace(/^#/,'')).f
 
 /* ===== State ===== */
 const state = {
-  notes: JSON.parse(localStorage.getItem('wl_notes')||'[]'),   // {id,title,content,tags[],created_at,updated_at,file?,debate[]}
+  notes: JSON.parse(localStorage.getItem('wl_notes')||'[]'),
   focusId: localStorage.getItem('wl_focusId') || null,
-  libProjectFilter: null,                                      // e.g., "project:Atlas"
+  libProjectFilter: localStorage.getItem('wl_proj') || null,
 };
 const save = () => { localStorage.setItem('wl_notes', JSON.stringify(state.notes)); localStorage.setItem('wl_focusId', state.focusId || ''); localStorage.setItem('wl_proj', state.libProjectFilter||''); };
 
@@ -350,10 +351,7 @@ function renderFolders(){
     wrap.innerHTML=`
       <div class="folder-head">
         <div><b>📁 ${escapeHTML(name)}</b> <span class="badge">${map[name].length}</span></div>
-        <div class="row">
-          <button class="btn" data-filter="${escapeHTML(name)}">Filter</button>
-          <button class="btn" data-toggle>▾</button>
-        </div>
+        <div class="muted">Open</div>
       </div>
       <div class="folder-items mono"></div>
     `;
@@ -361,8 +359,13 @@ function renderFolders(){
     items.textContent = map[name].map(id => {
       const n=state.notes.find(x=>x.id===id); return '• '+(n?.title||id);
     }).join('\n');
-    wrap.querySelector('[data-toggle]').addEventListener('click',()=>{ wrap.classList.toggle('open'); });
-    wrap.querySelector('[data-filter]').addEventListener('click',()=>{ state.libProjectFilter=name; save(); renderLibrary(); });
+    // Click project name: "open" the project (apply filter) and expand
+    wrap.querySelector('.folder-head').addEventListener('click',()=>{
+      state.libProjectFilter = name; save();
+      wrap.classList.add('open');
+      renderLibrary();
+      $('#lib-grid').scrollIntoView({behavior:'smooth',block:'nearest'});
+    });
     host.appendChild(wrap);
   });
 }
@@ -405,8 +408,27 @@ $('#lib-min-links').addEventListener('input', e=>{ $('#lib-min-links-val').textC
 $('#lib-sort').addEventListener('change', renderLibrary);
 $('#lib-clear').addEventListener('click',()=>{ state.libProjectFilter=null; $('#lib-search').value=''; $('#lib-tag-filter').value=''; $('#lib-min-links').value='0'; $('#lib-min-links-val').textContent='0'; save(); renderFolders(); renderLibrary(); });
 
-/* ===== Graph ===== */
+/* ===== Graph (non-overlapping layout) ===== */
 let cy=null;
+function nonOverlapLayout(){
+  return {
+    name: 'cose-bilkent',
+    randomize: false,
+    animate: 'end',
+    animationDuration: 400,
+    quality: 'proof',
+    nodeDimensionsIncludeLabels: true,
+    idealEdgeLength: 120,
+    edgeElasticity: 0.1,
+    nodeRepulsion: 6500,
+    gravity: 0.25,
+    gravityRange: 3.8,
+    gravityCompound: 1.0,
+    nestingFactor: 0.9,
+    padding: 30,
+    tile: true // helps distribute sparse nodes
+  };
+}
 function renderGraph(){
   $('#gr-breadth-val').textContent=$('#gr-breadth').value;
   $('#gr-depth-val').textContent=$('#gr-depth').value;
@@ -433,11 +455,11 @@ function renderGraph(){
         {selector:'edge', style:{'width':2,'line-color':'#cbd5e1','target-arrow-shape':'triangle','target-arrow-color':'#cbd5e1','curve-style':'bezier'}},
         {selector:':selected', style:{'border-color':'#111827','border-width':4}}
       ],
-      layout:{name:'cose',animate:true}
+      layout: nonOverlapLayout()
     });
     cy.on('tap','node',evt=>{ state.focusId=evt.target.id(); save(); renderCluster(); $('#cluster-pane').scrollIntoView({behavior:'smooth',block:'center'}); });
   } else {
-    cy.json({elements:els}); cy.layout({name:'cose',animate:true}).run();
+    cy.json({elements:els}); cy.layout(nonOverlapLayout()).run();
   }
 }
 $('#gr-breadth').addEventListener('input', renderGraph);
@@ -477,65 +499,21 @@ function renderCluster(){
 $('#cl-size').addEventListener('input', renderCluster);
 $('#cl-depth').addEventListener('input', renderCluster);
 
-/* ===== Export / Import / Example ===== */
+/* ===== Export / Import (JSON) ===== */
 $('#btn-export').addEventListener('click',()=>{ const data=JSON.stringify({notes:state.notes},null,2); const url=URL.createObjectURL(new Blob([data],{type:'application/json'})); const a=document.createElement('a'); a.href=url; a.download='willow_export.json'; a.click(); setTimeout(()=>URL.revokeObjectURL(url),500); });
 $('#file-import').addEventListener('change',async e=>{ const f=e.target.files[0]; if(!f) return; try{ const text=await f.text(); const data=JSON.parse(text); if(Array.isArray(data)) { state.notes=data; } else if(Array.isArray(data.notes)) { state.notes=data.notes; } else { throw new Error('Invalid JSON structure'); } save(); alert('Imported.'); renderLeftList(); renderFolders(); renderLibrary(); renderGraph(); renderCluster(); } catch{ alert('Invalid JSON.'); } });
 
-$('#btn-example').addEventListener('click',()=>{
-  if(!confirm('Load a large example dataset? (This overwrites current notes in localStorage)')) return;
-  state.notes = makeExampleDataset();
-  state.focusId = null; state.libProjectFilter = null; save();
-  renderLeftList(); renderFolders(); renderLibrary(); renderGraph(); renderCluster();
-  alert('Example dataset loaded!');
-});
-
-/* ===== Example Dataset (≈90 notes across 3 projects) ===== */
-function makeExampleDataset(){
-  const projects = ['project:Atlas','project:Borealis','project:Cascade'];
-  const tagsPool = ['banking','risk','inflation','growth','policy','energy','cre','markets','liquidity','macro','fintech','payments'];
-  const notes=[];
-  function add(title, content, tags){ notes.push({ id:uid(), title, content, tags, created_at:nowISO(), updated_at:nowISO(), debate:[] }); }
-
-  // Seeds (one per project)
-  add('Atlas Overview','Scope and objectives for Atlas initiative. [[Atlas Milestones]]', [projects[0],'macro','risk']);
-  add('Borealis Overview','North markets program synopsis. [[Borealis Milestones]]', [projects[1],'markets','growth']);
-  add('Cascade Overview','Automation & pipelines. [[Cascade Milestones]]', [projects[2],'fintech','payments']);
-
-  add('Atlas Milestones','Q1–Q4 deliverables.', [projects[0],'policy','macro']);
-  add('Borealis Milestones','Rollout plan and stakeholders.', [projects[1],'energy','growth']);
-  add('Cascade Milestones','ETL, quality, and monitoring.', [projects[2],'liquidity','risk']);
-
-  // Bulk generate 84 notes (28 per project)
-  let counter=1;
-  for(const proj of projects){
-    for(let i=0;i<28;i++){
-      const t1 = tagsPool[(i+counter)%tagsPool.length];
-      const t2 = tagsPool[(i*3+7)%tagsPool.length];
-      const title = `${proj.split(':')[1]} Note ${i+1}`;
-      const linkTo = (i%4===0) ? 'Inflation Watch' : (i%4===1) ? 'Bank Funding Stress' : (i%4===2) ? 'CRE Exposures' : 'Policy Path';
-      const content = `This is ${title}. It references [[${linkTo}]]. Random insight #${i}.`;
-      add(title, content, [proj,t1,t2]);
-      counter++;
-    }
-  }
-
-  // Shared cross-project notes
-  add('Bank Funding Stress','Deposits flowing to MMFs; pressures may spill to [[Regional Banks]] and [[CRE Exposures]].',[ 'banking','risk','liquidity' ]);
-  add('Regional Banks','Unrealized losses + deposit flight; linked to [[Bank Funding Stress]] and [[Policy Path]].',[ 'banking','risk' ]);
-  add('CRE Exposures','Vacancy up; maturities cluster 2026–2027; see [[Policy Path]].',[ 'cre','risk' ]);
-  add('Policy Path','Higher-for-longer; track term premium and funding costs.',[ 'policy','macro' ]);
-  add('Inflation Watch','Diffusion index of prices & wages. Links to [[Policy Path]].',[ 'inflation','macro' ]);
-
-  return notes;
-}
-
-/* ===== Boot default demo if empty ===== */
+/* ===== Small starter if empty (you can delete this block) ===== */
 if (state.notes.length === 0){
-  state.notes = makeExampleDataset().slice(0,12); // smaller starter; full set via Example button
-  save();
+  const A = {id:uid(), title:'Bank Funding Stress', content:'Deposits → MMFs. [[CRE Exposures]] [[Regional Banks]]', tags:['banking','risk','project:Atlas'], created_at:nowISO(), updated_at:nowISO(), debate:[]};
+  const B = {id:uid(), title:'CRE Exposures', content:'Office vacancy high; maturities in 26–27. [[Policy Path]]', tags:['cre','risk','project:Borealis'], created_at:nowISO(), updated_at:nowISO(), debate:[]};
+  const C = {id:uid(), title:'Policy Path', content:'Higher-for-longer; term premium.', tags:['policy','macro','project:Cascade'], created_at:nowISO(), updated_at:nowISO(), debate:[]};
+  const D = {id:uid(), title:'Regional Banks', content:'Unrealized losses + deposit flight. [[Bank Funding Stress]]', tags:['banking','project:Drift'], created_at:nowISO(), updated_at:nowISO(), debate:[]};
+  state.notes.push(A,B,C,D); save();
 }
 
-/* Initial view fills for Library/Graph when first opened */
+/* initial renders when landing */
+renderLeftList(); renderTagChips();
 </script>
 </body>
 </html>
