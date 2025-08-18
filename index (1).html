@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Willow — Notecard</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64'%3E%3Ctext y='50' font-size='48'%3E%F0%9F%8C%B2%3C/text%3E%3C/svg%3E">
+<style>
+  :root{
+    --ink:#222; --muted:#666; --line:#ddd; --bg:#fafafa; --chip:#f1f1f1;
+    --accent:#111; --btn:#f8f8f8;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.4 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,"Noto Sans",sans-serif}
+  header{padding:12px 20px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center}
+  h1{margin:0;font-size:18px}
+  .wrap{padding:16px;max-width:1200px;margin:0 auto}
+  .grid{display:grid;grid-template-columns:260px 1fr 280px;gap:16px;min-height:70vh}
+  .pane{background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px}
+  .tabs{display:flex;gap:6px;margin-bottom:8px}
+  .tab{border:1px solid var(--line);background:#fff;border-radius:8px;padding:6px 10px;font-size:12px;cursor:pointer}
+  .tab.active{background:#efefef}
+  .list{border-top:1px solid var(--line);margin-top:8px;max-height:70vh;overflow:auto}
+  .item{padding:10px;border-bottom:1px dashed #e5e5e5;cursor:pointer}
+  .item .t{font-weight:600}
+  .item .d{color:var(--muted);font-size:12px}
+  .field{margin-bottom:10px}
+  input[type="text"], textarea{width:100%;border:1px solid var(--line);border-radius:10px;padding:10px;font:inherit;background:#fff}
+  textarea{min-height:340px;resize:vertical}
+  .editor-head{display:flex;gap:8px;align-items:center}
+  .row{display:flex;justify-content:space-between;align-items:center;gap:10px}
+  .btn{background:var(--btn);border:1px solid var(--line);border-radius:10px;padding:8px 12px;cursor:pointer}
+  .btn.primary{background:#111;color:#fff;border-color:#111}
+  .chips{display:flex;flex-wrap:wrap;gap:6px}
+  .chip{background:var(--chip);border:1px solid var(--line);border-radius:999px;padding:4px 8px;font-size:12px}
+  .side-title{font-weight:700;margin:4px 0 8px}
+  .sugg{border-top:1px solid var(--line);padding-top:8px;max-height:60vh;overflow:auto}
+  .sugg-item{padding:6px;border:1px dashed #ddd;border-radius:8px;margin-bottom:8px;cursor:pointer}
+  .sugg-item:hover{background:#fafafa}
+  .debate{display:flex;flex-direction:column;gap:6px}
+  .badges{display:flex;gap:6px}
+  .mono{font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;font-size:12px;color:#555}
+  .muted{color:var(--muted)}
+  .footer{margin-top:8px;color:#888;font-size:12px;text-align:center}
+</style>
+</head>
+<body>
+<header>
+  <h1>Willow — Notecard</h1>
+  <div class="badges">
+    <button id="btn-export" class="btn">Export</button>
+    <label class="btn" style="cursor:pointer">
+      <input id="file-import" type="file" accept="application/json" style="display:none"> Import
+    </label>
+    <button id="btn-gensuggest" class="btn">Generate Suggestions</button>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="grid">
+    <!-- LEFT: Notes/Suggestions list -->
+    <aside class="pane" id="left-pane">
+      <div class="tabs">
+        <button id="tab-notes" class="tab active">Notes</button>
+        <button id="tab-suggestions" class="tab">Suggestions</button>
+      </div>
+      <div id="left-list" class="list"></div>
+    </aside>
+
+    <!-- CENTER: Editor -->
+    <section class="pane" id="center-pane">
+      <div class="field editor-head">
+        <input id="title" type="text" placeholder="Title (new note)">
+      </div>
+      <div class="field">
+        <textarea id="content" placeholder="Text (new note)
+The lazy brown fox jumps over the hedge.
+
+[[drafted links]]
+[[suggested links added if clicked]]"></textarea>
+      </div>
+      <div class="row">
+        <div class="badges">
+          <button id="btn-save" class="btn">Save</button>
+        </div>
+        <div class="badges">
+          <label class="btn">
+            <input id="file-attach" type="file" style="display:none">
+            FILE
+          </label>
+        </div>
+      </div>
+      <div class="field" style="margin-top:10px">
+        <input id="tags" type="text" placeholder="#Tags   #drafted tags; suggested">
+        <div id="tag-chips" class="chips" style="margin-top:6px"></div>
+      </div>
+      <div id="debate-thread" class="mono"></div>
+    </section>
+
+    <!-- RIGHT: Suggested Links + Debate -->
+    <aside class="pane" id="right-pane">
+      <div class="side-title">Suggested Links</div>
+      <div id="suggested" class="sugg"></div>
+      <div style="height:10px"></div>
+      <div class="row"><div class="side-title">Debate</div><button id="debate-toggle" class="btn" title="collapse/expand">▾</button></div>
+      <div id="debate" class="debate">
+        <select id="debate-agent">
+          <option>Historian</option>
+          <option>Blind Spot</option>
+          <option>Interconnectedness</option>
+          <option>Economist</option>
+        </select>
+        <textarea id="debate-text" rows="6" placeholder="Historian —
+This reminds me of ...
+..."></textarea>
+        <button id="debate-add" class="btn">Add</button>
+      </div>
+    </aside>
+  </div>
+  <div class="footer">Local-first. Your data stays in this browser (localStorage). Built for Willow PRD sketch layout.</div>
+</div>
+
+<script>
+// ------- State -------
+const state = {
+  notes: JSON.parse(localStorage.getItem('w2_notes')||'[]'), // {id,title,content,tags[],file?}
+  suggestions: JSON.parse(localStorage.getItem('w2_suggestions')||'[]'), // cached last suggestions
+  draftId: null,
+};
+function saveAll(){ localStorage.setItem('w2_notes', JSON.stringify(state.notes)); localStorage.setItem('w2_suggestions', JSON.stringify(state.suggestions)); }
+function uid(){ return crypto.randomUUID ? crypto.randomUUID() : String(Date.now()+Math.random()); }
+function oneSentence(s){ s = (s||'').replace(/\s+/g,' ').trim(); const cut = s.indexOf('.'); return (cut>40? s.slice(0,140)+'…' : (cut>0? s.slice(0,cut+1): s.slice(0,140))) || '(no description)'; }
+function atCursorInsert(textarea, text){
+  const start = textarea.selectionStart, end = textarea.selectionEnd;
+  const before = textarea.value.substring(0,start), after = textarea.value.substring(end);
+  textarea.value = before + text + after;
+  const pos = start + text.length;
+  textarea.selectionStart = textarea.selectionEnd = pos;
+  textarea.focus();
+}
+
+// ------- Elements -------
+const elLeftList = document.getElementById('left-list');
+const elTabNotes = document.getElementById('tab-notes');
+const elTabSuggestions = document.getElementById('tab-suggestions');
+const elTitle = document.getElementById('title');
+const elContent = document.getElementById('content');
+const elTags = document.getElementById('tags');
+const elTagChips = document.getElementById('tag-chips');
+const elSuggested = document.getElementById('suggested');
+const elDebateThread = document.getElementById('debate-thread');
+
+// ------- Rendering -------
+let leftMode = 'notes';
+function renderLeft(){
+  elLeftList.innerHTML='';
+  if (leftMode==='notes'){
+    if (state.notes.length===0){ elLeftList.innerHTML='<div class="item muted">No notes saved.</div>'; return; }
+    state.notes.slice().sort((a,b)=> new Date(b.updated_at||b.created_at) - new Date(a.updated_at||a.created_at)).forEach((n,i)=>{
+      const div = document.createElement('div'); div.className='item';
+      div.innerHTML = `<div class="t">${escape(n.title||'(untitled)')}</div>
+                       <div class="d">${escape(oneSentence(n.content))}</div>`;
+      div.addEventListener('click', ()=>loadNote(n.id));
+      elLeftList.appendChild(div);
+    });
+  } else {
+    if (state.suggestions.length===0){ elLeftList.innerHTML='<div class="item muted">No agent suggestions yet. Click "Generate Suggestions".</div>'; return; }
+    state.suggestions.forEach(s => {
+      const div = document.createElement('div'); div.className='item';
+      div.innerHTML = `<div class="t">${escape(s.title)}</div><div class="d">${escape(s.reason||'Suggestion')}</div>`;
+      div.addEventListener('click', ()=>insertSuggestion(s));
+      elLeftList.appendChild(div);
+    });
+  }
+}
+function renderSuggestedLinks(){
+  elSuggested.innerHTML = '';
+  state.suggestions.forEach(s => {
+    const a = document.createElement('div');
+    a.className='sugg-item';
+    a.innerHTML = `<div><b>${escape(s.title)}</b></div><div class="muted" style="font-size:12px">${escape(s.reason||oneSentence(s.preview||''))}</div>`;
+    a.title = 'Click to insert [[link]] into editor';
+    a.addEventListener('click', ()=>insertSuggestion(s));
+    elSuggested.appendChild(a);
+  });
+}
+function renderTags(){
+  const tags = (elTags.value||'').split(',').map(t=>t.trim()).filter(Boolean);
+  elTagChips.innerHTML = tags.map(t=>`<span class="chip">#${escape(t)}</span>`).join('');
+}
+function renderAll(){ renderLeft(); renderSuggestedLinks(); renderTags(); }
+
+// ------- Actions -------
+function loadNote(id){
+  const n = state.notes.find(x=>x.id===id); if (!n) return;
+  state.draftId = n.id;
+  elTitle.value = n.title || '';
+  elContent.value = n.content || '';
+  elTags.value = (n.tags||[]).join(', ');
+  renderTags();
+}
+function currentNoteFromEditor(){
+  return {
+    id: state.draftId || uid(),
+    title: elTitle.value.trim(),
+    content: elContent.value,
+    tags: (elTags.value||'').split(',').map(s=>s.trim()).filter(Boolean),
+    file: null,
+  };
+}
+function insertSuggestion(s){
+  atCursorInsert(elContent, `[[${s.title}]]`);
+}
+function escape(s){ return (''+s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',\"'\":'&#39;'}[m])); }
+
+// Generate suggestions: simple tag-overlap heuristic with existing notes
+function generateSuggestions(){
+  const note = currentNoteFromEditor();
+  const suggestions = [];
+  state.notes.forEach(n => {
+    if (!n.title) return;
+    const overlap = (n.tags||[]).filter(t => (note.tags||[]).includes(t));
+    if (overlap.length>0){
+      suggestions.push({ id:n.id, title:n.title, reason:`Shares ${overlap.length} tag(s): ${overlap.join(', ')}`, preview:n.content.slice(0,160)});
+    }
+  });
+  // also propose 2 generic prompts
+  suggestions.push({ id: 'hist', title: 'Historian: analog to dot-com era', reason:'Debate prompt', preview:'' });
+  suggestions.push({ id: 'blind', title: 'Blind Spot: EM spillovers', reason:'Debate prompt', preview:'' });
+  state.suggestions = suggestions;
+  saveAll(); renderSuggestedLinks(); if (leftMode==='suggestions') renderLeft();
+}
+
+// Debate: append a mono block beneath editor
+document.getElementById('debate-add').addEventListener('click', () => {
+  const who = document.getElementById('debate-agent').value;
+  const text = document.getElementById('debate-text').value.trim();
+  if (!text) return;
+  const block = `\n— ${who} —\n${text}\n`;
+  const pre = document.createElement('pre'); pre.className='mono'; pre.textContent = block;
+  elDebateThread.appendChild(pre);
+  document.getElementById('debate-text').value='';
+});
+
+document.getElementById('debate-toggle').addEventListener('click', () => {
+  const d = document.getElementById('debate'); d.style.display = (d.style.display==='none'?'grid':'none');
+});
+
+// Save note
+document.getElementById('btn-save').addEventListener('click', () => {
+  const n = currentNoteFromEditor();
+  if (!n.title) { alert('Please give the note a title.'); return; }
+  const i = state.notes.findIndex(x=>x.id===n.id);
+  const stamp = new Date().toISOString();
+  if (i>=0){ n.created_at = state.notes[i].created_at; n.updated_at = stamp; state.notes[i] = n; }
+  else { n.created_at = stamp; state.notes.push(n); state.draftId = n.id; }
+  saveAll(); renderLeft(); alert('Saved.');
+});
+
+// File attach (metadata only, local)
+document.getElementById('file-attach').addEventListener('change', (e) => {
+  const file = e.target.files[0]; if (!file) return;
+  const n = currentNoteFromEditor(); n.file = {name:file.name, size:file.size};
+  const i = state.notes.findIndex(x=>x.id===(state.draftId||''));
+  if (i>=0){ state.notes[i].file = n.file; }
+  saveAll(); alert('Attached (stored metadata locally).');
+});
+
+// Export/Import
+document.getElementById('btn-export').addEventListener('click', () => {
+  const data = JSON.stringify(state, null, 2);
+  const url = URL.createObjectURL(new Blob([data], {type:'application/json'}));
+  const a = document.createElement('a'); a.href=url; a.download='willow_notecard.json'; a.click();
+  setTimeout(()=>URL.revokeObjectURL(url), 500);
+});
+document.getElementById('file-import').addEventListener('change', async (e) => {
+  const file = e.target.files[0]; if (!file) return;
+  try{
+    const text = await file.text();
+    const data = JSON.parse(text);
+    state.notes = data.notes||state.notes;
+    state.suggestions = data.suggestions||state.suggestions;
+    saveAll(); renderAll(); alert('Imported.');
+  } catch { alert('Invalid JSON.'); }
+});
+
+// Tabs
+elTabNotes.addEventListener('click', () => { leftMode='notes'; elTabNotes.classList.add('active'); elTabSuggestions.classList.remove('active'); renderLeft(); });
+elTabSuggestions.addEventListener('click', () => { leftMode='suggestions'; elTabSuggestions.classList.add('active'); elTabNotes.classList.remove('active'); renderLeft(); });
+
+// Inputs
+document.getElementById('btn-gensuggest').addEventListener('click', generateSuggestions);
+elTags.addEventListener('input', renderTags);
+
+// Initial render
+renderAll();
+</script>
+</body>
+</html>
