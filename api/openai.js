@@ -1,4 +1,4 @@
-// file: api/openai.js
+// api/openai.js
 export async function onRequestPost(context) {
   const body = await context.request.json();
   const resp = await fetch("https://api.openai.com/v1/chat/completions", {
