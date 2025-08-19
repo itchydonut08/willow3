@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Willow — Notes • Library • Physics Graph • Forecasting</title>
+<link rel="preconnect" href="https://d3js.org">
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<style>
+/* ============ THEME ============ */
+:root{
+  --ink:#111827; --muted:#6b7280; --bg:#f8fafc; --panel:#ffffff;
+  --line:#e5e7eb; --chip:#f3f4f6; --btn:#f9fafb; --link:#0ea5e9;
+  --g-edge:#cbd5e1; --g-node:#0ea5e9; --g-stroke:#0f172a;
+  --g-label:#0f172a; --g-focus:#fb7185; --g-bg:#ffffff;
+}
+[data-theme="dark"]{
+  --ink:#e5e7eb; --muted:#9ca3af; --bg:#0b1020; --panel:#0f172a;
+  --line:#1f2937; --chip:#111827; --btn:#111827; --link:#38bdf8;
+  --g-edge:#334155; --g-node:#22d3ee; --g-stroke:#e5e7eb;
+  --g-label:#e5e7eb; --g-focus:#fb7185; --g-bg:#0f172a;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,"Noto Sans",sans-serif}
+header{padding:12px 20px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;background:var(--panel);position:sticky;top:0;z-index:5}
+.title{display:flex;gap:10px;align-items:baseline}.title h1{margin:0;font-size:18px}
+.nav{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.nav a{padding:6px 10px;border:1px solid var(--line);border-radius:10px;background:var(--panel);text-decoration:none;color:inherit}
+.nav a.active{background:var(--ink);color:var(--panel)}
+.wrap{max-width:1200px;margin:0 auto;padding:16px}
+.grid-3{display:grid;grid-template-columns:260px 1fr 300px;gap:16px}
+.pane{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px}
+.tabs{display:flex;gap:8px}.tab{padding:6px 10px;border:1px solid var(--line);border-radius:10px;background:var(--panel);cursor:pointer;color:var(--ink)}.tab.active{background:var(--chip)}
+.list{border-top:1px solid var(--line);margin-top:10px;max-height:70vh;overflow:auto}
+.item{padding:10px;border-bottom:1px dashed var(--line);cursor:pointer}.item .t{font-weight:600}.muted{color:var(--muted)}
+.row{display:flex;gap:10px;align-items:center}.row.space{justify-content:space-between}
+.btn{background:var(--btn);border:1px solid var(--line);border-radius:10px;padding:8px 12px;cursor:pointer;color:var(--ink)}
+input[type="text"],textarea,select{width:100%;border:1px solid var(--line);border-radius:10px;padding:10px;background:var(--panel);color:var(--ink);font:inherit}
+textarea{min-height:260px;resize:vertical}
+.chips{display:flex;gap:6px;flex-wrap:wrap}.chip{background:var(--chip);border:1px solid var(--line);border-radius:999px;padding:4px 8px;font-size:12px;color:var(--ink)}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono",monospace;font-size:12px;color:var(--muted)}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px;cursor:pointer;display:flex;flex-direction:column}
+.card .title{font-weight:700;font-size:13px;margin-bottom:6px}.card .preview{color:var(--muted);font-size:12px;flex:1}.card .meta{display:flex;gap:8px;color:var(--muted);font-size:11px;margin-top:6px}
+#gwrap{position:relative}
+#gcanvas{width:100%;height:520px;border:1px solid var(--line);border-radius:12px;background:var(--panel);display:block;touch-action:none}
+.tooltip{position:absolute;pointer-events:none;background:var(--ink);color:var(--panel);padding:6px 8px;border-radius:8px;font-size:12px;opacity:0;transition:opacity .15s}
+.footer{text-align:center;color:var(--muted);font-size:12px;margin:12px 0 24px}
+.note-card{background:var(--panel);border:1px dashed var(--line);border-radius:12px;padding:10px}
+.projects-bar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.proj{display:flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:6px 10px;cursor:pointer}
+.proj .count{background:rgba(99,102,241,.15);border:1px solid rgba(99,102,241,.35);border-radius:999px;padding:2px 6px;font-size:11px}
+.badge{border:1px solid var(--line);padding:2px 6px;border-radius:999px;font-size:11px;background:var(--btn);color:var(--ink)}
+.gctrls{display:flex;gap:14px;align-items:center;margin-bottom:10px;flex-wrap:wrap}
+</style>
+</head>
+<body>
+<header>
+  <div class="title">
+    <h1>Willow</h1><span class="muted">Notes • Library • Physics Graph • Forecast</span>
+  </div>
+  <nav class="nav">
+    <a href="#/notecard" id="nav-notecard" class="active">Notecard</a>
+    <a href="#/library" id="nav-library">Library</a>
+    <a href="#/graph" id="nav-graph">Graph</a>
+    <a href="#/forecast" id="nav-forecast">Forecast</a>
+    <span class="muted">•</span>
+    <button id="btn-export" class="btn">Export</button>
+    <label class="btn" style="cursor:pointer"><input id="file-import" type="file" accept="application/json" style="display:none"> Import</label>
+    <button id="btn-theme" class="btn" title="Toggle dark mode">Theme</button>
+  </nav>
+</header>
+
+<main class="wrap">
+  <!-- ===== Notecard ===== -->
+  <section id="view-notecard" class="grid-3">
+    <aside class="pane">
+      <div class="tabs">
+        <button id="tab-notes" class="tab active">Notes</button>
+        <button id="tab-suggestions" class="tab">Suggestions</button>
+      </div>
+      <div id="left-list" class="list"></div>
+    </aside>
+    <section class="pane">
+      <input id="nc-title" type="text" placeholder="Title (new note)"/>
+      <textarea id="nc-content" placeholder="Text (new note). Use [[wikilinks]] to connect notes."></textarea>
+      <div class="row space" style="margin-top:6px">
+        <div class="row">
+          <button id="btn-save" class="btn">Save</button>
+          <button id="btn-new" class="btn">New</button>
+        </div>
+        <label class="btn"><input id="file-attach" type="file" style="display:none"> Attach file (metadata)</label>
+      </div>
+      <input id="nc-tags" type="text" placeholder="#Tags comma or #prefix"/>
+      <div id="tag-chips" class="chips" style="margin-top:6px"></div>
+      <div class="row" style="margin-top:10px">
+        <select id="debate-agent" style="width:auto">
+          <option value="Historian">Historian</option>
+          <option value="Economist">Economist</option>
+          <option value="Contrarian">Contrarian</option>
+          <option value="BlindSpot">Blind Spot</option>
+          <option value="Interconnectedness">Interconnectedness</option>
+        </select>
+        <button id="debate-ask" class="btn">Ask AI</button>
+        <button id="debate-add" class="btn">Add to note</button>
+      </div>
+      <pre id="debate-output" class="mono" style="white-space:pre-wrap"></pre>
+    </section>
+    <aside class="pane">
+      <div class="row space">
+        <div class="muted">Suggested Links</div>
+        <button class="btn" id="btn-run-suggest">Run</button>
+      </div>
+      <div id="suggested" class="list"></div>
+    </aside>
+  </section>
+
+  <!-- ===== Library ===== -->
+  <section id="view-library" style="display:none">
+    <div class="pane">
+      <h3 style="margin:0 0 8px">LIBRARY</h3>
+      <div id="projects-bar" class="projects-bar"></div>
+      <div class="lib-controls row" style="flex-wrap:wrap">
+        <input id="lib-search" type="text" placeholder="Search titles/content" style="flex:1;min-width:220px"/>
+        <input id="lib-tags" type="text" placeholder="#tag1, #tag2" style="min-width:200px"/>
+        <span class="muted">Min links</span><input id="lib-min" type="range" min="0" max="10" step="1" value="0"><span id="lib-min-val" class="badge">0</span>
+        <span class="muted">Card size</span><input id="lib-size" type="range" min="160" max="320" step="10" value="220">
+        <label class="row"><span class="muted">Newest first</span><input id="lib-sort" type="checkbox" checked style="margin-left:6px"></label>
+        <span id="lib-active-project" class="chip" style="display:none;cursor:pointer" title="Click to clear">Project: -</span>
+        <button id="lib-clear" class="btn">Clear</button>
+      </div>
+      <div id="lib-grid" class="lib-grid" style="display:grid;gap:12px"></div>
+    </div>
+  </section>
+
+  <!-- ===== Graph ===== -->
+  <section id="view-graph" style="display:none">
+    <div class="pane">
+      <h3 style="margin:0 0 8px">GRAPH (Physics)</h3>
+      <div class="gctrls">
+        <span class="muted">Breadth</span><input id="gr-breadth" type="range" min="0" max="10" step="1" value="0"><span id="gr-breadth-val" class="badge">0</span>
+        <span class="muted">Depth</span><input id="gr-depth" type="range" min="1" max="6" step="1" value="3"><span id="gr-depth-val" class="badge">3</span>
+        <span class="muted">G (attraction)</span><input id="gr-G" type="range" min="0" max="200" step="5" value="60"><span id="gr-G-val" class="badge">60</span>
+        <span class="muted">Collision +padding</span><input id="gr-pad" type="range" min="0" max="20" step="1" value="6"><span id="gr-pad-val" class="badge">6</span>
+        <span class="muted">Link base</span><input id="gr-link" type="range" min="40" max="220" step="5" value="110"><span id="gr-link-val" class="badge">110</span>
+        <span class="muted">Similarity weight</span><input id="gr-simw" type="range" min="0" max="2" step="0.1" value="1"><span id="gr-simw-val" class="badge">1.0</span>
+        <button id="gr-reset-focus" class="btn">Clear focus</button>
+        <button id="gr-pause" class="btn">Pause</button>
+        <button id="gr-reheat" class="btn">Reheat</button>
+        <button id="gr-resetview" class="btn">Reset View</button>
+      </div>
+      <div id="gwrap">
+        <canvas id="gcanvas" width="1000" height="520"></canvas>
+        <div id="gtooltip" class="tooltip"></div>
+      </div>
+      <div class="muted" style="margin-top:8px">Zoom: wheel/pinch • Pan: drag background • Drag a node to move it • Click node to focus (center & filter by Depth).</div>
+    </div>
+
+    <div class="pane" id="cluster-pane" style="margin-top:16px">
+      <div class="row space">
+        <h3 style="margin:0">GRAPH: Card Cluster</h3>
+        <div class="row"><span class="muted">Card size</span><input id="cl-size" type="range" min="160" max="320" step="10" value="220"><span class="muted">Depth</span><input id="cl-depth" type="range" min="1" max="5" step="1" value="1"></div>
+      </div>
+      <div class="grid-3" style="grid-template-columns:220px 1fr;gap:16px">
+        <aside><div class="muted">Focus Note</div><div id="cl-focus" class="note-card"></div><div class="muted" style="margin:8px 0">Linked notes</div><div id="cl-links" class="mono" style="font-size:12px"></div></aside>
+        <section id="cl-canvas" style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-start"></section>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== Forecast ===== -->
+  <section id="view-forecast" style="display:none">
+    <div class="pane">
+      <div class="row space">
+        <h3 style="margin:0">FORECASTING</h3>
+        <div class="row" style="gap:8px">
+          <a class="btn" href="#/forecast">Main</a>
+          <a class="btn" href="#/forecast/questions">Questions</a>
+          <a class="btn" href="#/forecast/analysis">Analysis</a>
+        </div>
+      </div>
+    </div>
+
+    <div id="fc-main" class="pane" style="margin-top:12px;display:none">
+      <div class="row space">
+        <div class="row" style="gap:24px">
+          <div><div style="font-size:28px;font-weight:800" id="fc-brier">—</div><div class="muted">Brier Score</div></div>
+          <div><div style="font-size:28px;font-weight:800" id="fc-count">0</div><div class="muted">Forecasts</div></div>
+        </div>
+        <div class="row" style="gap:8px"><span class="muted">As of date</span><input id="fc-asof" type="date"/></div>
+      </div>
+      <div class="row" style="gap:16px;align-items:flex-start;margin-top:12px">
+        <canvas id="fc-spark" width="520" height="120" style="border:1px solid var(--line);border-radius:10px;background:var(--panel)"></canvas>
+        <canvas id="fc-scatter" width="520" height="160" style="border:1px solid var(--line);border-radius:10px;background:var(--panel)"></canvas>
+      </div>
+      <div class="row" style="gap:16px;align-items:flex-start;margin-top:12px">
+        <div style="flex:1"><div class="muted">Best forecasts</div><ol id="fc-best" class="mono"></ol></div>
+        <div style="flex:1"><div class="muted">Worst forecasts</div><ol id="fc-worst" class="mono"></ol></div>
+      </div>
+    </div>
+
+    <div id="fc-qlist" class="pane" style="margin-top:12px;display:none">
+      <div class="row" style="gap:10px;align-items:flex-end">
+        <div style="flex:1"><label class="muted">Search</label><input id="fc-q-search" type="text" placeholder="Find a question"/></div>
+        <div><label class="muted">Sort by</label><select id="fc-q-sort"><option value="date">Date</option><option value="new">New forecasts</option></select></div>
+        <button class="btn" id="fc-q-new">New Question</button>
+      </div>
+      <div id="fc-q-list" class="list" style="margin-top:8px"></div>
+    </div>
+
+    <div id="fc-qdetail" class="pane" style="margin-top:12px;display:none">
+      <div id="fc-q-head" class="row space"></div>
+      <div class="tabs" style="margin-top:8px">
+        <button class="tab active" data-fc-tab="forecast">Forecast</button>
+        <button class="tab" data-fc-tab="activity">Activity</button>
+        <button class="tab" data-fc-tab="crowd">Crowd forecast</button>
+        <button class="tab" data-fc-tab="notes">NOTES</button>
+      </div>
+      <div id="fc-tab-forecast" class="pane" style="border:none;padding:0;margin-top:8px">
+        <div id="fc-answers"></div>
+        <div class="row space" style="margin-top:8px">
+          <div class="muted mono" id="fc-sumcheck">Probabilities must sum to 100%.</div>
+          <div class="row" style="gap:8px">
+            <button class="btn" id="fc-save">Save</button>
+            <button class="btn" id="fc-submit">Submit</button>
+          </div>
+        </div>
+      </div>
+      <div id="fc-tab-activity" class="pane" style="display:none;border:none;padding:0;margin-top:8px"><div id="fc-activity" class="mono muted">No activity yet.</div></div>
+      <div id="fc-tab-crowd" class="pane" style="display:none;border:none;padding:0;margin-top:8px"><div class="row space"><div class="muted">Aggregate distribution</div></div><div id="fc-crowd-bars" style="margin-top:8px"></div></div>
+      <div id="fc-tab-notes" class="pane" style="display:none;border:none;padding:0;margin-top:8px">
+        <div class="row space"><div class="muted">Relevant NOTES</div><button class="btn" id="fc-notes-agent">Ask Note Forecast Agent</button></div>
+        <div class="row" style="gap:16px;align-items:flex-start;margin-top:8px">
+          <textarea id="fc-notes-list" class="mono" style="height:200px;flex:1" placeholder="Matched notes will appear here..."></textarea>
+          <div id="fc-notes-cluster" style="flex:1;min-height:200px;border:1px dashed var(--line);border-radius:10px;padding:8px"></div>
+        </div>
+        <pre id="fc-agent-output" class="mono" style="white-space:pre-wrap;margin-top:8px"></pre>
+      </div>
+    </div>
+
+    <div id="fc-analysis" class="pane" style="margin-top:12px;display:none">
+      <h3 style="margin:0 0 8px">FORECASTING: Analysis</h3>
+      <div class="row" style="gap:16px">
+        <textarea class="mono" style="height:260px;flex:1" placeholder="[Group/individual analysis of outcomes, patterns, etc.]"></textarea>
+        <textarea class="mono" style="height:260px;flex:1" placeholder="[Patterns relative to NOTES: linkages vs accuracy, misses & blind spots, etc.]"></textarea>
+      </div>
+    </div>
+  </section>
+</main>
+
+<div class="footer">Local-first. All data is in your browser (localStorage + IndexedDB). © 2025</div>
+
+<script>
+/*** ===== Helpers / Globals ===== ***/
+const $ = s => document.querySelector(s);
+const $$ = s => Array.from(document.querySelectorAll(s));
+const esc = s => (''+s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[m]));
+const uid = () => (crypto.randomUUID ? crypto.randomUUID() : (Date.now()+Math.random()).toString(36));
+const now = () => new Date().toISOString();
+
+let canvas, ctx, transform = {k:1,x:0,y:0}, APP_READY=false;
+
+/*** ===== Theme ===== ***/
+const THEME_KEY='willow_theme';
+function applyTheme(t){ document.documentElement.setAttribute('data-theme', t); if(APP_READY && ctx) draw(); }
+function initTheme(){
+  const saved = localStorage.getItem(THEME_KEY);
+  const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  applyTheme(saved || (prefersDark ? 'dark':'light'));
+}
+function toggleTheme(){
+  const cur = document.documentElement.getAttribute('data-theme') || 'light';
+  const nxt = cur==='dark' ? 'light' : 'dark';
+  localStorage.setItem(THEME_KEY, nxt); applyTheme(nxt);
+}
+
+/*** ===== App State ===== ***/
+const st = { notes: JSON.parse(localStorage.getItem('wl_notes')||'[]'), focusId: localStorage.getItem('wl_focusId')||null, projFilter: localStorage.getItem('wl_proj')||null, prompts:{} };
+const persist = () => { localStorage.setItem('wl_notes', JSON.stringify(st.notes)); localStorage.setItem('wl_focusId', st.focusId||''); localStorage.setItem('wl_proj', st.projFilter||''); };
+
+/*** ===== Graph helpers ===== ***/
+function extractLinks(text){ const out=[]; if(!text) return out; const re=/\[\[([^\]]+)\]\]/g; let m; while((m=re.exec(text))!==null) out.push(m[1].trim()); return out; }
+function buildGraph(){
+  const titleToId={}; st.notes.forEach(n=>{ if(n.title) titleToId[n.title]=n.id; });
+  const edges=[]; st.notes.forEach(n=>{ extractLinks(n.content).forEach(t=>{ const to=titleToId[t]; if(to && to!==n.id) edges.push({source:n.id,target:to}); }); });
+  return {edges};
+}
+function degreeMap(edges){ const d={}; edges.forEach(e=>{ d[e.source]=(d[e.source]||0)+1; d[e.target]=(d[e.target]||0)+1; }); return d; }
+function neighborsMap(edges){ const map={}; edges.forEach(e=>{ (map[e.source]=map[e.source]||new Set()).add(e.target); (map[e.target]=map[e.target]||new Set()).add(e.source); }); return map; }
+
+/*** ===== Router ===== ***/
+function show(h){
+  h = h || location.hash || '#/notecard';
+  $('#nav-notecard').classList.toggle('active', h==='#/notecard');
+  $('#nav-library').classList.toggle('active', h==='#/library');
+  $('#nav-graph').classList.toggle('active', h==='#/graph');
+  $('#nav-forecast').classList.toggle('active', h.startsWith('#/forecast'));
+  $('#view-notecard').style.display = h==='#/notecard' ? '' : 'none';
+  $('#view-library').style.display = h==='#/library' ? '' : 'none';
+  $('#view-graph').style.display = h==='#/graph' ? '' : 'none';
+  $('#view-forecast').style.display = h.startsWith('#/forecast') ? '' : 'none';
+  if(h==='#/library'){ renderProjectsBar(); renderLibrary(); }
+  if(h==='#/graph'){ initPhysics(); renderCluster(); }
+  if(h.startsWith('#/forecast')){ routeForecast(); }
+}
+
+/*** ===== Notecard ===== ***/
+let leftMode='notes', currentId=null;
+function renderLeft(){
+  const host=$('#left-list'); host.innerHTML='';
+  if(leftMode==='notes'){
+    if(st.notes.length===0){ host.innerHTML='<div class="item muted">No notes saved.</div>'; return; }
+    st.notes.slice().sort((a,b)=>new Date(b.updated_at||b.created_at)-new Date(a.updated_at||a.created_at)).forEach(n=>{
+      const d=document.createElement('div'); d.className='item';
+      d.innerHTML = `<div class="t">${esc(n.title||'(untitled)')}</div><div class="muted">${esc((n.content||'').slice(0,120))}${(n.content||'').length>120?'…':''}</div>`;
+      d.onclick=()=>load(n.id); host.appendChild(d);
+    });
+  } else { renderSuggestions(); }
+}
+function chipTags(){ const t=tagsOf($('#nc-tags').value); $('#tag-chips').innerHTML=t.map(x=>`<span class="chip">#${esc(x)}</span>`).join(''); }
+function load(id){
+  const n=st.notes.find(x=>x.id===id); if(!n) return; currentId=id; st.focusId=id; persist();
+  $('#nc-title').value=n.title||''; $('#nc-content').value=n.content||''; $('#nc-tags').value=(n.tags||[]).join(', '); chipTags();
+}
+const tagsOf = s => (s||'').split(',').map(x=>x.trim().replace(/^#/, '')).filter(Boolean);
+const draft = ()=>({ id: currentId||uid(), title: $('#nc-title').value.trim(), content: $('#nc-content').value, tags: tagsOf($('#nc-tags').value) });
+
+function suggestFor(n){
+  const {edges}=buildGraph(); const deg=degreeMap(edges);
+  const kw = new Set((n.title||'').toLowerCase().split(/\W+/).filter(x=>x.length>3));
+  const out=[]; st.notes.forEach(m=>{
+    if(!m.title || m.id===n.id) return;
+    const tagI=(m.tags||[]).filter(t=>(n.tags||[]).includes(t));
+    const wordI=(m.title||'').toLowerCase().split(/\W+/).filter(x=>x.length>3 && kw.has(x));
+    const score = tagI.length*2 + wordI.length + (deg[m.id]||0)*0.1;
+    if(score>0) out.push({id:m.id,title:m.title,reason:`Tags: ${tagI.join(', ')||'-'} | Words: ${wordI.join(', ')||'-'} | Links: ${deg[m.id]||0}`});
+  });
+  out.sort((a,b)=>b.reason.length-a.reason.length); return out.slice(0,12);
+}
+function renderSuggestions(){
+  const host=$('#suggested'); host.innerHTML='';
+  const items=suggestFor(draft());
+  if(items.length===0){ host.innerHTML='<div class="item muted">No suggestions yet.</div>'; return; }
+  items.forEach(s=>{
+    const d=document.createElement('div'); d.className='item'; d.innerHTML=`<div class="t">${esc(s.title)}</div><div class="muted">${esc(s.reason)}</div>`;
+    d.onclick = ()=>{ const ta=$('#nc-content'); const txt=`[[${s.title}]]`; const p=ta.selectionStart||ta.value.length; ta.value=ta.value.slice(0,p)+txt+ta.value.slice(p); ta.selectionStart=ta.selectionEnd=p+txt.length; ta.focus(); };
+    host.appendChild(d);
+  });
+}
+$('#btn-run-suggest').onclick=renderSuggestions;
+$('#tab-notes').onclick=()=>{ leftMode='notes'; $('#tab-notes').classList.add('active'); $('#tab-suggestions').classList.remove('active'); renderLeft(); };
+$('#tab-suggestions').onclick=()=>{ leftMode='suggestions'; $('#tab-suggestions').classList.add('active'); $('#tab-notes').classList.remove('active'); renderLeft(); };
+$('#btn-new').onclick=()=>{ currentId=null; $('#nc-title').value=''; $('#nc-content').value=''; $('#nc-tags').value=''; chipTags(); };
+$('#btn-save').onclick=()=>{
+  const n=draft(); if(!n.title){ alert('Title, please.'); return; }
+  const i=st.notes.findIndex(x=>x.id===n.id); const t=now();
+  if(i>=0) st.notes[i]={...st.notes[i],...n,updated_at:t}; else st.notes.push({...n,created_at:t,updated_at:t,debate:[]});
+  persist(); renderLeft(); alert('Saved.');
+};
+$('#file-attach').onchange=e=>{
+  const f=e.target.files[0]; if(!f) return; if(!currentId){ alert('Save the note first, then attach.'); return; }
+  const i=st.notes.findIndex(x=>x.id===currentId); st.notes[i].file={name:f.name,size:f.size,type:f.type}; persist(); alert('Attached (metadata only).');
+};
+$('#nc-tags').oninput=chipTags;
+
+/*** ===== Agents via GitHub Pages Function ===== ***/
+const defaultPrompts = {
+  "Historian": {"system":"You are a meticulous historian. Provide context and precedents.","user":"Note title: {title}\nNote text:\n{text}\nWrite 1-2 tight paragraphs with parallels and what to watch.","temperature":0.6,"model":"gpt-4o-mini"},
+  "Economist": {"system":"You are a pragmatic macroeconomist. Quantify where possible.","user":"Given the note "{title}":\n{text}\nReturn bullets for mechanisms, data to check, and a base/alt scenario.","temperature":0.5,"model":"gpt-4o-mini"},
+  "Contrarian": {"system":"You challenge assumptions with evidence; be constructive.","user":"Critique key assumptions in "{title}".\n{text}\nGive 3-5 counterpoints and 2 falsification tests.","temperature":0.7,"model":"gpt-4o-mini"},
+  "BlindSpot": {"system":"Identify omissions and risks.","user":"For "{title}", list blind spots, missing stakeholders, and unintended consequences.\n{text}\nReturn a short checklist.","temperature":0.5,"model":"gpt-4o-mini"},
+  "Interconnectedness": {"system":"Map 2nd/3rd-order links across domains.","user":"Note "{title}":\n{text}\nGive a compact map of 2nd/3rd-order effects and which prior notes to link to (just titles).","temperature":0.6,"model":"gpt-4o-mini"}
+};
+async function loadPrompts(){ try{ const res=await fetch('prompts.json',{cache:'no-store'}); st.prompts = res.ok? await res.json() : defaultPrompts; } catch{ st.prompts = defaultPrompts; } }
+loadPrompts();
+
+async function askAgent(){
+  const agentKey=$('#debate-agent').value;
+  const P = st.prompts[agentKey]||defaultPrompts[agentKey]||defaultPrompts.Historian;
+  const note=draft();
+  const body={ model:P.model||'gpt-4o-mini', temperature: P.temperature ?? 0.7, messages:[
+    {role:'system',content:P.system||'You are a helpful assistant.'},
+    {role:'user',content:(P.user||'').replaceAll('{title}', note.title||'').replaceAll('{text}', note.content||'')}
+  ]};
+  $('#debate-output').textContent='Thinking...';
+  try{
+    const r=await fetch('/api/openai',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    if(!r.ok) throw new Error(await r.text());
+    const data=await r.json();
+    $('#debate-output').textContent = data.choices?.[0]?.message?.content || '(no text)';
+  }catch(err){ $('#debate-output').textContent='Agent error: '+err.message; }
+}
+$('#debate-ask').onclick=askAgent;
+$('#debate-add').onclick=()=>{
+  const t=$('#debate-output').textContent.trim(); if(!t){ alert('Ask AI first, or type something.'); return; }
+  const n=st.notes.find(x=>x.id===currentId); if(!n){ alert('Save the note first.'); return; }
+  n.debate=n.debate||[]; n.debate.push({who:$('#debate-agent').value,text:t,at:now()}); n.updated_at=now(); persist(); alert('Added to note.');
+};
+
+/*** ===== Projects bar ===== ***/
+function projectsMap(){ const m={}; st.notes.forEach(n=> (n.tags||[]).forEach(t=>{ const l=t.toLowerCase(); if(l.startsWith('project')||l.startsWith('proj:')) (m[t]=m[t]||[]).push(n.id); })); return m; }
+function renderProjectsBar(){
+  const bar=$('#projects-bar'); bar.innerHTML=''; const map=projectsMap(); const names=Object.keys(map).sort((a,b)=>a.localeCompare(b));
+  if(!names.length){ bar.innerHTML='<span class="muted">No projects yet. Add tags like "project:Atlas".</span>'; return; }
+  names.forEach(name=>{ const c=document.createElement('div'); c.className='proj'; c.innerHTML=`<b>${esc(name)}</b> <span class="count">${map[name].length}</span>`;
+    c.onclick=()=>{ st.projFilter=name; persist(); $('#lib-active-project').textContent=`Project: ${name}`; $('#lib-active-project').style.display='inline-flex'; renderLibrary(); };
+    bar.appendChild(c);
+  });
+}
+
+/*** ===== Library ===== ***/
+function renderLibrary(){
+  $('#lib-min-val').textContent=$('#lib-min').value;
+  const size=+$('#lib-size').value, search=$('#lib-search').value.toLowerCase(), tags=tagsOf($('#lib-tags').value);
+  const {edges}=buildGraph(); const deg=degreeMap(edges);
+  let items=st.notes.slice();
+  if(st.projFilter){ const set=new Set(projectsMap()[st.projFilter]||[]); items=items.filter(n=>set.has(n.id)); }
+  if(search) items=items.filter(n=> (n.title||'').toLowerCase().includes(search) || (n.content||'').toLowerCase().includes(search) );
+  if(tags.length) items=items.filter(n=>tags.every(t=>(n.tags||[]).includes(t)));
+  const min=+$('#lib-min').value; if(min>0) items=items.filter(n=>(deg[n.id]||0)>=min);
+  const newest=$('#lib-sort').checked; items.sort((a,b)=>(newest?1:-1)*(new Date(b.updated_at||b.created_at)-new Date(a.updated_at||a.created_at)));
+  const grid=$('#lib-grid'); grid.style.gridTemplateColumns=`repeat(auto-fill,minmax(${size}px,1fr))`;
+  grid.innerHTML= items.length ? items.map(n=>`
+    <article class="card" data-id="${n.id}">
+      <div class="title">${esc(n.title||'(untitled)')}</div>
+      <div class="preview">${esc((n.content||'').slice(0,140))}${(n.content||'').length>140?'…':''}</div>
+      <div class="meta"><span class="badge">#${(n.tags||[]).length} tags</span><span class="badge">${(deg[n.id]||0)} links</span></div>
+    </article>`).join('') : '<div class="muted">No results.</div>';
+  $$('#lib-grid .card').forEach(c=>c.onclick=()=>{ const id=c.getAttribute('data-id'); st.focusId=id; persist(); location.hash='#/notecard'; load(id); renderLeft(); });
+}
+$('#lib-size').oninput=renderLibrary; $('#lib-search').oninput=renderLibrary; $('#lib-tags').oninput=renderLibrary;
+$('#lib-min').oninput=e=>{ $('#lib-min-val').textContent=e.target.value; renderLibrary(); };
+$('#lib-sort').onchange=renderLibrary;
+$('#lib-clear').onclick=()=>{ st.projFilter=null; $('#lib-active-project').style.display='none'; $('#lib-search').value=''; $('#lib-tags').value=''; $('#lib-min').value='0'; $('#lib-min-val').textContent='0'; persist(); renderProjectsBar(); renderLibrary(); };
+$('#lib-active-project').onclick=()=>$('#lib-clear').click();
+
+/*** ===== Physics Graph ===== ***/
+let sim=null, nodes=[], links=[];
+const g = { G:60, pad:6, linkBase:110, simW:1.0, paused:false, focusPull:0.6 };
+const tooltip = $('#gtooltip');
+function themeColors(){
+  const cs=getComputedStyle(document.documentElement);
+  return { edge:cs.getPropertyValue('--g-edge').trim()||'#cbd5e1', node:cs.getPropertyValue('--g-node').trim()||'#0ea5e9', stroke:cs.getPropertyValue('--g-stroke').trim()||'#0f172a', label:cs.getPropertyValue('--g-label').trim()||'#0f172a', focus:cs.getPropertyValue('--g-focus').trim()||'#fb7185', bg:cs.getPropertyValue('--g-bg').trim()||'#ffffff' };
+}
+function resizeCanvas(){ const rect=canvas.getBoundingClientRect(); const dpr=window.devicePixelRatio||1; canvas.width=Math.max(2,Math.floor(rect.width*dpr)); canvas.height=Math.max(2,Math.floor(rect.height*dpr)); if(APP_READY) draw(); }
+window.addEventListener('resize', ()=>{ resizeCanvas(); if(sim) sim.alpha(0.2).restart(); });
+
+function simTags(A,B){ const a=new Set((A||[]).map(s=>s.toLowerCase())); const b=new Set((B||[]).map(s=>s.toLowerCase())); if(a.size===0 && b.size===0) return 0; let inter=0; a.forEach(t=>{ if(b.has(t)) inter++; }); const uni=a.size+b.size-inter; return inter/uni; }
+
+function dataForPhysics(){
+  const {edges}=buildGraph(); const deg=degreeMap(edges);
+  const breadth=+$('#gr-breadth').value; const focus=st.focusId; const depth=+$('#gr-depth').value;
+  $('#gr-breadth-val').textContent=breadth; $('#gr-depth-val').textContent=depth;
+  let allowed=new Set(st.notes.map(n=>n.id));
+  if(focus){
+    const neigh=neighborsMap(edges); allowed=new Set([focus]); let frontier=new Set([focus]);
+    for(let d=0; d<depth; d++){ const nxt=new Set(); frontier.forEach(v=> (neigh[v]||new Set()).forEach(u=>nxt.add(u))); nxt.forEach(v=>allowed.add(v)); frontier=nxt; }
+  }
+  const nodelist = st.notes.filter(n=>allowed.has(n.id) && (deg[n.id]||0)>=breadth).map(n=>{
+    const k=deg[n.id]||0; const mass=1+Math.sqrt(k); const r=10+k*2;
+    return {id:n.id,title:n.title||'(untitled)',degree:k,mass,r,tags:n.tags||[],x:(Math.random()-0.5)*60,y:(Math.random()-0.5)*60};
+  });
+  const idTo=new Map(nodelist.map(n=>[n.id,n]));
+  const linklist = edges.filter(e=>idTo.has(e.source)&&idTo.has(e.target)).map(e=>{ const a=idTo.get(e.source), b=idTo.get(e.target); return {source:a,target:b,sim:simTags(a.tags,b.tags)}; });
+  return {nodelist, linklist};
+}
+
+function draw(){
+  if(!ctx) return; const dpr=window.devicePixelRatio||1; const col=themeColors();
+  ctx.save(); ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.fillStyle=col.bg; ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.translate(transform.x, transform.y); ctx.scale(transform.k, transform.k);
+  // edges (thicker/darker when touching focus)
+  links.forEach(l=>{
+    const isFocus=(l.source.id===st.focusId || l.target.id===st.focusId);
+    ctx.beginPath();
+    ctx.lineWidth = isFocus ? 3/transform.k : 1.25/transform.k;
+    ctx.strokeStyle = isFocus ? col.stroke : col.edge;
+    ctx.moveTo(l.source.x, l.source.y);
+    ctx.lineTo(l.target.x, l.target.y);
+    ctx.stroke();
+  });
+  // nodes
+  nodes.forEach(n=>{
+    ctx.beginPath();
+    ctx.fillStyle = (st.focusId===n.id) ? col.focus : col.node;
+    ctx.strokeStyle = col.stroke;
+    ctx.lineWidth = 1.5/transform.k;
+    ctx.arc(n.x, n.y, n.r, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+    // label
+    ctx.save(); ctx.scale(1/transform.k,1/transform.k); ctx.fillStyle=col.label; ctx.font='10px system-ui,sans-serif';
+    const text = n.title.length>34 ? n.title.slice(0,34)+'…' : n.title;
+    const labelX = (n.x*transform.k) - (ctx.measureText(text).width/2);
+    const labelY = (n.y*transform.k) - (n.r*transform.k + 6);
+    ctx.fillText(text, labelX, labelY); ctx.restore();
+  });
+  ctx.restore();
+}
+function nodeAtWorld(x,y){ for(let i=nodes.length-1;i>=0;i--){ const n=nodes[i]; const dx=x-n.x, dy=y-n.y; if(dx*dx+dy*dy <= (n.r+6)*(n.r+6)) return n; } return null; }
+function pointerToWorld(ev){ const rect=canvas.getBoundingClientRect(); const px=ev.clientX-rect.left, py=ev.clientY-rect.top; return { x:(px-transform.x)/transform.k, y:(py-transform.y)/transform.k }; }
+function handleHover(ev){ const rect=canvas.getBoundingClientRect(); const px=ev.clientX-rect.left, py=ev.clientY-rect.top; const w={x:(px-transform.x)/transform.k,y:(py-transform.y)/transform.k}; const n=nodeAtWorld(w.x,w.y); if(n){ tooltip.style.opacity=1; tooltip.style.left=(ev.clientX+12)+'px'; tooltip.style.top=(ev.clientY+12)+'px'; tooltip.textContent=`${n.title}  deg ${n.degree}`; canvas.style.cursor='pointer'; } else { tooltip.style.opacity=0; canvas.style.cursor='grab'; } }
+
+let isDragging=false, dragNode=null;
+function setupZoomPan(){
+  // wheel zoom about cursor
+  canvas.addEventListener('wheel', (ev)=>{
+    ev.preventDefault();
+    const scale=Math.pow(1.0015, -ev.deltaY);
+    const rect=canvas.getBoundingClientRect(); const mx=ev.clientX-rect.left, my=ev.clientY-rect.top;
+    const kNew=Math.min(6, Math.max(0.2, transform.k*scale));
+    transform.x = mx - (mx - transform.x) * (kNew/transform.k);
+    transform.y = my - (my - transform.y) * (kNew/transform.k);
+    transform.k = kNew; draw();
+  }, {passive:false});
+  // pan / drag
+  let panning=false, panStart=null, startTransform=null;
+  canvas.addEventListener('mousedown', (ev)=>{ const w=pointerToWorld(ev); const n=nodeAtWorld(w.x,w.y);
+    if(n){ isDragging=true; dragNode=n; canvas.style.cursor='grabbing'; n.fx=n.x; n.fy=n.y; if(sim) sim.alphaTarget(0.6).restart(); ev.preventDefault(); }
+    else { panning=true; panStart={x:ev.clientX,y:ev.clientY}; startTransform={...transform}; canvas.style.cursor='grabbing'; }
+  });
+  window.addEventListener('mousemove', (ev)=>{
+    if(isDragging && dragNode){ const w=pointerToWorld(ev); dragNode.fx=w.x; dragNode.fy=w.y; draw(); return; }
+    if(panning){ transform.x=startTransform.x+(ev.clientX-panStart.x); transform.y=startTransform.y+(ev.clientY-panStart.y); draw(); }
+    else { handleHover(ev); }
+  });
+  window.addEventListener('mouseup', ()=>{ if(isDragging && dragNode){ dragNode.fx=null; dragNode.fy=null; if(sim) sim.alphaTarget(0).restart(); } isDragging=false; dragNode=null; canvas.style.cursor='grab'; panning=false; });
+  canvas.addEventListener('click', (ev)=>{ const w=pointerToWorld(ev); const n=nodeAtWorld(w.x,w.y); if(n){ st.focusId=n.id; persist(); initPhysics(); renderCluster(); } });
+}
+function updateLinkForce(){ if(!sim) return; const flink=sim.force('link'); flink.distance(d=>{ const base=+$('#gr-link').value; const simW=+$('#gr-simw').value; const dist=Math.max(40, base*(1 - 0.45*simW*(d.sim||0))); return dist; }); flink.strength(d=>{ const simW=+$('#gr-simw').value; return Math.min(0.9, 0.06*(1 + 1.4*simW*(d.sim||0))); }); }
+function initPhysics(){
+  const {nodelist, linklist} = dataForPhysics(); nodes=nodelist; links=linklist;
+  const dpr=window.devicePixelRatio||1; const cx=(canvas.width/dpr)/2, cy=(canvas.height/dpr)/2; transform={k:1,x:cx,y:cy};
+  if(sim) sim.stop();
+  const flink=d3.forceLink(links).id(d=>d.id);
+  const fAttract=d3.forceManyBody().strength(d=>+$('#gr-G').value * d.mass).theta(0.9);
+  const fRepel=d3.forceManyBody().strength(d=>-18*(1+0.2)).theta(0.9);
+  const pad=+$('#gr-pad').value;
+  const focus=st.focusId;
+  const fCollide=d3.forceCollide().radius(d=>d.r + pad + ((focus && d.id===focus)? Math.max(2, pad*1.2) : 0)).iterations(2);
+  const fFocus=d3.forceRadial(0, 0, 0).strength(d => (focus && d.id===focus)? g.focusPull : 0);
+  sim = d3.forceSimulation(nodes).force('link',flink).force('attract',fAttract).force('repel',fRepel).force('collide',fCollide).force('focus',fFocus).force('center', d3.forceCenter(0,0)).velocityDecay(0.35).alphaMin(0.02).alpha(0.9).on('tick', draw);
+  updateLinkForce();
+  $('#gr-breadth-val').textContent=$('#gr-breadth').value; $('#gr-depth-val').textContent=$('#gr-depth').value; $('#gr-G-val').textContent=$('#gr-G').value; $('#gr-pad-val').textContent=$('#gr-pad').value; $('#gr-link-val').textContent=$('#gr-link').value; $('#gr-simw-val').textContent=(+$('#gr-simw').value).toFixed(1);
+  canvas.style.cursor='grab'; if(g.paused) sim.stop(); draw();
+}
+
+/*** ===== Card Cluster ===== ***/
+function renderCluster(){
+  const size=+$('#cl-size').value, depth=+$('#cl-depth').value, focus=st.focusId;
+  const {edges}=buildGraph(); const neigh=neighborsMap(edges);
+  const focusNote=st.notes.find(n=>n.id===focus);
+  $('#cl-focus').innerHTML = focusNote ? `<div style="font-weight:700">${esc(focusNote.title||'(untitled)')}</div><div class="mono" style="white-space:pre-wrap">${esc((focusNote.content||'').slice(0,220))}${(focusNote.content||'').length>220?'…':''}</div><div class="chips" style="margin-top:6px">${(focusNote.tags||[]).map(t=>`<span class="chip">#${esc(t)}</span>`).join('')}</div>` : '<div class="muted">No focus selected.</div>';
+  const canvasEl=$('#cl-canvas'); canvasEl.innerHTML=''; $('#cl-links').textContent=''; if(!focusNote) return;
+  const seen=new Set([focus]); let frontier=new Set([focus]); const levels={[focus]:0};
+  for(let d=0; d<depth; d++){ const nxt=new Set(); frontier.forEach(v=> (neigh[v]||new Set()).forEach(u=>{ if(!seen.has(u)){ seen.add(u); nxt.add(u); levels[u]=d+1; } })); frontier=nxt; }
+  seen.delete(focus);
+  $('#cl-links').textContent=Array.from(seen).map(id=>`• (${levels[id]}) ${st.notes.find(x=>x.id===id)?.title||id}`).join('\n');
+  Array.from(seen).forEach(id=>{
+    const n=st.notes.find(x=>x.id===id); if(!n) return;
+    const card=document.createElement('article'); card.className='note-card'; card.style.width=size+'px';
+    card.innerHTML = `<div style="font-weight:700">${esc(n.title||'(untitled)')}</div><div class="mono" style="white-space:pre-wrap">${esc((n.content||'').slice(0,160))}${(n.content||'').length>160?'…':''}</div><div class="chips" style="margin-top:6px">${(n.tags||[]).map(t=>`<span class="chip">#${esc(t)}</span>`).join('')}</div><div class="row" style="margin-top:6px"><button class="btn" data-open="${n.id}">Open</button><button class="btn" data-link="${n.title}">[[Link]]</button></div>`;
+    canvasEl.appendChild(card);
+  });
+  $$('[data-open]').forEach(b=> b.onclick=()=>{ const id=b.getAttribute('data-open'); location.hash='#/notecard'; load(id); renderLeft(); });
+  $$('[data-link]').forEach(b=> b.onclick=()=>{ const title=b.getAttribute('data-link'); location.hash='#/notecard'; const ta=$('#nc-content'); const txt=`[[${title}]]`; const p=ta.selectionStart||ta.value.length; ta.value=ta.value.slice(0,p)+txt+ta.value.slice(p); ta.selectionStart=ta.selectionEnd=p+txt.length; ta.focus(); });
+}
+$('#cl-size').oninput=renderCluster; $('#cl-depth').oninput=renderCluster;
+
+/*** ===== Import/Export ===== ***/
+$('#btn-export').onclick=()=>{ const data=JSON.stringify({notes:st.notes},null,2); const url=URL.createObjectURL(new Blob([data],{type:'application/json'})); const a=document.createElement('a'); a.href=url; a.download='willow_export.json'; a.click(); setTimeout(()=>URL.revokeObjectURL(url),500); };
+$('#file-import').onchange=async e=>{ const f=e.target.files[0]; if(!f) return; try{ const text=await f.text(); const data=JSON.parse(text); st.notes = Array.isArray(data) ? data : (Array.isArray(data.notes)? data.notes : []); persist(); alert('Imported.'); renderLeft(); renderProjectsBar(); renderLibrary(); if(APP_READY){ initPhysics(); renderCluster(); } }catch{ alert('Invalid JSON.'); } };
+
+/*** ===== Bind Graph Controls ===== ***/
+function bindGraphControls(){
+  $('#gr-G').oninput=()=>{ $('#gr-G-val').textContent=$('#gr-G').value; if(sim){ sim.force('attract').strength(d=>+$('#gr-G').value*d.mass); sim.alpha(0.25).restart(); } };
+  $('#gr-pad').oninput=()=>{ $('#gr-pad-val').textContent=$('#gr-pad').value; if(sim){ const focus=st.focusId; sim.force('collide').radius(d=>d.r + +$('#gr-pad').value + (focus && d.id===focus ? Math.max(2,+$('#gr-pad').value*1.2):0)); sim.alpha(0.25).restart(); } };
+  $('#gr-link').oninput=()=>{ $('#gr-link-val').textContent=$('#gr-link').value; updateLinkForce(); if(sim) sim.alpha(0.25).restart(); };
+  $('#gr-simw').oninput=()=>{ $('#gr-simw-val').textContent=(+$('#gr-simw').value).toFixed(1); updateLinkForce(); if(sim) sim.alpha(0.25).restart(); };
+  $('#gr-breadth').oninput=()=>{ initPhysics(); };
+  $('#gr-depth').oninput=()=>{ initPhysics(); };
+  $('#gr-reset-focus').onclick=()=>{ st.focusId=null; persist(); initPhysics(); renderCluster(); };
+  $('#gr-pause').onclick=()=>{ g.paused=!g.paused; if(g.paused){ if(sim) sim.stop(); $('#gr-pause').textContent='Resume'; } else { if(sim) sim.alpha(0.35).restart(); $('#gr-pause').textContent='Pause'; } };
+  $('#gr-reheat').onclick=()=>{ if(sim) sim.alpha(0.9).restart(); };
+  $('#gr-resetview').onclick=()=>{ const dpr=window.devicePixelRatio||1; const cx=(canvas.width/dpr)/2, cy=(canvas.height/dpr)/2; transform={k:1,x:cx,y:cy}; draw(); };
+}
+
+/*** ===== IndexedDB (Forecast DB) ===== ***/
+const DB_NAME='willow_db', DB_VER=1; let dbh=null;
+function dbOpen(){ return new Promise((resolve,reject)=>{ const req=indexedDB.open(DB_NAME, DB_VER); req.onupgradeneeded=(e)=>{ const db=e.target.result;
+  if(!db.objectStoreNames.contains('questions')){ const qs=db.createObjectStore('questions',{keyPath:'id'}); qs.createIndex('closesAt','closesAt',{unique:false}); }
+  if(!db.objectStoreNames.contains('forecasts')){ const fs=db.createObjectStore('forecasts',{keyPath:'id'}); fs.createIndex('byQ','questionId',{unique:false}); }
+  if(!db.objectStoreNames.contains('events')){ db.createObjectStore('events',{keyPath:'id'}); }
+}; req.onsuccess=()=>{ dbh=req.result; resolve(); }; req.onerror=()=>reject(req.error); }); }
+function dbTx(name, mode='readonly'){ return dbh.transaction(name, mode).objectStore(name); }
+function dbGetAll(store, index=null, key=null){ return new Promise((res,rej)=>{ const s=dbTx(store); const src=index? s.index(index) : s; const req = key!==null? src.getAll(key) : src.getAll(); req.onsuccess=()=>res(req.result); req.onerror=()=>rej(req.error); }); }
+function dbPut(store, value){ return new Promise((res,rej)=>{ const s=dbTx(store,'readwrite'); const req=s.put(value); req.onsuccess=()=>res(); req.onerror=()=>rej(req.error); }); }
+function dbGet(store, key){ return new Promise((res,rej)=>{ const s=dbTx(store); const req=s.get(key); req.onsuccess=()=>res(req.result||null); req.onerror=()=>rej(req.error); }); }
+
+const fc = { asOf:null, curQ:null };
+function pct(n){ return Math.round(n)+'%'; }
+function sum(arr){ return arr.reduce((a,b)=>a+(+b||0),0); }
+function newid(){ return crypto.randomUUID ? crypto.randomUUID() : uid(); }
+
+function seedForecastingIfEmpty(){
+  return dbGetAll('questions').then(all=>{ if(all.length) return;
+    const nowISO=new Date().toISOString();
+    const sample=[
+      { id:newid(), title:"When will Moody's or S&P downgrade the U.S. sovereign debt rating?", closesAt:"2025-12-01T04:00:00.000Z", answers:[{id:'a1',text:'Before Oct 1, 2025'},{id:'a2',text:'Between Oct–Dec 2025'},{id:'a3',text:'In 2026 or later'}], outcome:null, created_at:nowISO, tags:['rating','policy'] },
+      { id:newid(), title:"Where will 10-year Treasury yields be on October 1?", closesAt:"2025-10-01T04:00:00.000Z", answers:[{id:'b1',text:'Below 3.5%'},{id:'b2',text:'3.5–4.25%'},{id:'b3',text:'4.25–5.0%'},{id:'b4',text:'Above 5.0%'}], outcome:null, created_at:nowISO, tags:['rates','macro'] }
+    ];
+    return Promise.all(sample.map(q=>dbPut('questions', q)));
+  });
+}
+
+/*** Brier ***/
+async function computeUserBrier(asOf=null){
+  const forecasts=await dbGetAll('forecasts'); const questions=await dbGetAll('questions');
+  const qById=new Map(questions.map(q=>[q.id,q])); let sumB=0, n=0;
+  forecasts.forEach(f=>{
+    if(asOf && new Date(f.asOf) > new Date(asOf)) return;
+    const q=qById.get(f.questionId); if(!q || !q.outcome) return;
+    const k=q.answers.length; const probs=f.probs; const o=q.answers.map(a=>a.id===q.outcome.answerId?1:0);
+    const b=o.reduce((acc,ok,idx)=>acc+Math.pow((probs[idx]||0)-ok,2),0); sumB+=b; n++;
+  });
+  return {brier: n? (sumB/n) : null, count:n};
+}
+
+/*** Forecast Router ***/
+function routeForecast(){
+  const h=location.hash;
+  $('#nav-forecast').classList.toggle('active', h.startsWith('#/forecast'));
+  if(h==='#/forecast' || h==='#/forecast/main'){ $('#fc-main').style.display=''; $('#fc-qlist').style.display='none'; $('#fc-qdetail').style.display='none'; $('#fc-analysis').style.display='none'; renderForecastMain(); }
+  else if(h==='#/forecast/questions'){ $('#fc-main').style.display='none'; $('#fc-qlist').style.display=''; $('#fc-qdetail').style.display='none'; $('#fc-analysis').style.display='none'; renderQuestionList(); }
+  else if(h.startsWith('#/forecast/q/')){ const id=h.split('/').pop(); openQuestionDetail(id); }
+  else if(h==='#/forecast/analysis'){ $('#fc-main').style.display='none'; $('#fc-qlist').style.display='none'; $('#fc-qdetail').style.display='none'; $('#fc-analysis').style.display=''; }
+}
+
+/*** Forecast Main ***/
+async function renderForecastMain(){
+  const asOf = $('#fc-asof').value || null;
+  const {brier,count}=await computeUserBrier(asOf);
+  $('#fc-brier').textContent = (brier==null)? '—' : brier.toFixed(3);
+  $('#fc-count').textContent = count||0;
+  const qs=await dbGetAll('questions'); const fs=await dbGetAll('forecasts'); const fByQ=new Map();
+  fs.forEach(f=>{ if(asOf && new Date(f.asOf)>new Date(asOf)) return; fByQ.set(f.questionId,f); });
+  const rows=[]; qs.forEach(q=>{ if(!q.outcome) return; const f=fByQ.get(q.id); if(!f) return; const o=q.answers.map(a=>a.id===q.outcome.answerId?1:0); const b=o.reduce((acc,ok,idx)=>acc+Math.pow((f.probs[idx]||0)-ok,2),0); rows.push({title:q.title,b}); });
+  rows.sort((a,b)=>a.b-b.b);
+  $('#fc-best').innerHTML = rows.length? rows.slice(0,5).map(r=>`<li>${esc(r.title)} (${r.b.toFixed(2)})</li>`).join('') : '<li class="muted">No resolved questions yet.</li>';
+  $('#fc-worst').innerHTML = rows.length? rows.slice(-5).reverse().map(r=>`<li>${esc(r.title)} (${r.b.toFixed(2)})</li>`).join('') : '<li class="muted">No resolved questions yet.</li>';
+  drawSpark('#fc-spark', fs, asOf); drawScatter('#fc-scatter', fs, asOf);
+}
+$('#fc-asof').onchange=renderForecastMain;
+function drawSpark(sel, forecasts, asOf){
+  const c=$(sel), ctx=c.getContext('2d'); ctx.clearRect(0,0,c.width,c.height);
+  const xs = forecasts.filter(f=>!asOf || new Date(f.asOf)<=new Date(asOf)).sort((a,b)=>new Date(a.asOf)-new Date(b.asOf)).map(f=> sum(f.probs)/f.probs.length );
+  if(xs.length<2) return; ctx.beginPath(); ctx.moveTo(10, c.height-10 - xs[0]*(c.height-20));
+  for(let i=1;i<xs.length;i++){ const x=10 + i*(c.width-20)/(xs.length-1); const y=c.height-10 - xs[i]*(c.height-20); ctx.lineTo(x,y); }
+  ctx.strokeStyle=themeColors().stroke; ctx.lineWidth=2; ctx.stroke();
+}
+function drawScatter(sel, forecasts, asOf){
+  const c=$(sel), ctx=c.getContext('2d'); ctx.clearRect(0,0,c.width,c.height);
+  const pts = forecasts.filter(f=>!asOf || new Date(f.asOf)<=new Date(asOf)).map(f=>({x:Math.random(), y:sum(f.probs)/f.probs.length}));
+  const pad=14, w=c.width-2*pad, h=c.height-2*pad; ctx.strokeStyle=themeColors().edge; ctx.strokeRect(pad,pad,w,h);
+  pts.forEach(p=>{ ctx.beginPath(); ctx.arc(pad+p.x*w, pad+p.y*h, 3, 0, Math.PI*2); ctx.fillStyle=themeColors().node; ctx.fill(); });
+}
+
+/*** Questions list ***/
+async function renderQuestionList(){
+  const q = (await dbGetAll('questions')).sort((a,b)=>new Date(a.closesAt)-new Date(b.closesAt));
+  const fs = await dbGetAll('forecasts'); const byQ=new Map(); fs.forEach(f=>byQ.set(f.questionId,(byQ.get(f.questionId)||0)+1));
+  const host=$('#fc-q-list'); host.innerHTML='';
+  if(!q.length){ host.innerHTML='<div class="item muted">No questions yet.</div>'; return; }
+  q.forEach(row=>{ const d=document.createElement('div'); d.className='item';
+    d.innerHTML = `<div class="t">${esc(row.title)}</div><div class="muted">Closing ${new Date(row.closesAt).toLocaleString()} • ${(byQ.get(row.id)||0)} forecasts</div><div class="muted"><a href="#/forecast/q/${row.id}">Open</a></div>`; host.appendChild(d); });
+}
+$('#fc-q-new').onclick=async ()=>{
+  const ttl=prompt('Question title?'); if(!ttl) return;
+  const closes=prompt('Closes ISO (e.g., 2025-12-31T04:00:00.000Z)'); if(!closes) return;
+  const opts=prompt('Answer options (comma separated)'); if(!opts) return;
+  const q={ id:newid(), title:ttl, closesAt:closes, answers:opts.split(',').map(s=>({id:newid(),text:s.trim()})), outcome:null, created_at:now(), tags:[] };
+  await dbPut('questions', q); renderQuestionList();
+};
+
+/*** Question detail ***/
+async function openQuestionDetail(qid){
+  const q=await dbGet('questions', qid);
+  $('#fc-main').style.display='none'; $('#fc-qlist').style.display='none'; $('#fc-qdetail').style.display=''; $('#fc-analysis').style.display='none';
+  if(!q){ $('#fc-qdetail').innerHTML='<div class="muted">Not found.</div>'; return; } fc.curQ=q;
+  $('#fc-q-head').innerHTML = `<div><div style="font-weight:700">${esc(q.title)}</div><div class="muted">Closing ${new Date(q.closesAt).toLocaleString()}</div></div><div class="row" style="gap:8px"><button class="btn" id="fc-resolve">Resolve</button><a class="btn" href="#/forecast/questions">Back</a></div>`;
+  renderAnswerSliders(q); renderActivity(q); renderCrowd(q); renderNotesTab(q);
+  $$('[data-fc-tab]').forEach(b=> b.onclick=()=>{ $$('[data-fc-tab]').forEach(x=>x.classList.remove('active')); b.classList.add('active');
+    ['forecast','activity','crowd','notes'].forEach(name=>{ $('#fc-tab-'+name).style.display = (b.dataset.fcTab===name)? '' : 'none'; });
+  });
+  $('#fc-resolve').onclick=async ()=>{ if(q.outcome){ alert('Already resolved.'); return; } const idx=prompt('Enter the winning answer index (1..N)'); const i=(parseInt(idx,10)||0)-1; if(i<0 || i>=q.answers.length) return; q.outcome={answerId:q.answers[i].id, at:now()}; await dbPut('questions', q); alert('Resolved. Dashboard will include it in Brier after you have a forecast saved.'); renderCrowd(q); };
+  $('#fc-save').onclick=()=>saveForecast(false); $('#fc-submit').onclick=()=>saveForecast(true);
+}
+async function saveForecast(submit=false){
+  const q=fc.curQ; if(!q) return; const sliders=$$('[data-fc-prob]'); const probs=sliders.map(s=> parseInt(s.value,10)/100 );
+  const s=sum(probs); const norm = s>0? probs.map(p=>p/s) : probs.map(_=>0);
+  $('#fc-sumcheck').textContent='Sum: '+pct(sum(norm)*100/100)+' (normalized on save)';
+  const rec={ id:newid(), questionId:q.id, asOf:now(), probs:norm, submitted:submit };
+  await dbPut('forecasts', rec); await dbPut('events', {id:newid(), type:'forecast', questionId:q.id, at:rec.asOf}); renderActivity(q); renderCrowd(q); alert(submit?'Submitted!':'Saved.');
+}
+function renderAnswerSliders(q){
+  const host=$('#fc-answers'); host.innerHTML='';
+  q.answers.forEach((a,i)=>{ const row=document.createElement('div'); row.className='row'; row.style.margin='8px 0';
+    row.innerHTML = `<div style="flex:1">${esc(a.text)}</div><input type="range" min="0" max="100" step="1" value="${Math.floor(100/q.answers.length)}" data-fc-prob="${i}" style="width:240px"><span class="badge" id="fc-prob-${i}">${pct(100/q.answers.length)}</span>`;
+    host.appendChild(row);
+  });
+  $$('[data-fc-prob]').forEach((r,i)=>{ r.oninput=()=>{ $('#fc-prob-'+i).textContent=pct(r.value); const sliders=$$('[data-fc-prob]'); const total=sliders.reduce((a,b)=>a+parseInt(b.value,10),0); $('#fc-sumcheck').textContent='Current sum: '+total+'% (normalized on save/submit)'; }; });
+}
+async function renderActivity(q){
+  const events=(await dbGetAll('events')).filter(e=>e.questionId===q.id).sort((a,b)=>new Date(b.at)-new Date(a.at));
+  $('#fc-activity').textContent = events.length? events.map(e=>`• ${e.type} @ ${new Date(e.at).toLocaleString()}`).join('\n') : 'No activity yet.';
+}
+async function renderCrowd(q){
+  const fs=(await dbGetAll('forecasts')).filter(f=>f.questionId===q.id); const k=q.answers.length; const avg=new Array(k).fill(0);
+  if(fs.length){ fs.forEach(f=> f.probs.forEach((p,i)=> avg[i]+=p)); for(let i=0;i<k;i++) avg[i]/=fs.length; }
+  const host=$('#fc-crowd-bars'); host.innerHTML='';
+  q.answers.forEach((a,i)=>{ const pctStr=pct((avg[i]||0)*100); const row=document.createElement('div'); row.className='row'; row.style.margin='6px 0';
+    row.innerHTML = `<div style="width:40%">${esc(a.text)}</div><div style="flex:1;background:var(--chip);border:1px solid var(--line);border-radius:8px;overflow:hidden"><div style="height:12px;background:var(--link);width:${(avg[i]||0)*100}%"></div></div><span class="badge">${pctStr}</span>`; host.appendChild(row);
+  });
+}
+function renderNotesTab(q){
+  const words=new Set((q.title||'').toLowerCase().split(/\W+/).filter(w=>w.length>3));
+  const hits=st.notes.filter(n=>{ const bag=(n.title+' '+n.content).toLowerCase().split(/\W+/); return bag.some(w=>words.has(w)); });
+  $('#fc-notes-list').value = hits.length? hits.map((n,i)=>`${i+1}. ${n.title}\n`).join('') : '';
+  const div=$('#fc-notes-cluster'); div.innerHTML=''; hits.slice(0,12).forEach(n=>{ const card=document.createElement('div'); card.className='card'; card.style.width='220px'; card.innerHTML=`<div class="title">${esc(n.title)}</div><div class="preview">${esc((n.content||'').slice(0,120))}${(n.content||'').length>120?'…':''}</div><div class="meta"><span class="badge">#${(n.tags||[]).length} tags</span></div>`; card.onclick=()=>{ location.hash='#/notecard'; load(n.id); renderLeft(); }; div.appendChild(card); });
+  $('#fc-notes-agent').onclick=async ()=>{
+    const P={system:"You are a concise forecasting assistant. Consider the user's notes and the question.",user:`Question: ${q.title}\nNotes:\n${hits.map(n=>`- ${n.title}: ${n.content.slice(0,200)}`).join('\n')}\nGive a short qualitative view and 2-3 factors that would move odds.`};
+    const body={ model:'gpt-4o-mini', temperature:0.6, messages:[{role:'system',content:P.system},{role:'user',content:P.user}] };
+    $('#fc-agent-output').textContent='Thinking...';
+    try{ const r=await fetch('/api/openai',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}); if(!r.ok) throw new Error(await r.text()); const data=await r.json(); $('#fc-agent-output').textContent=data.choices?.[0]?.message?.content || '(no text)'; }catch(err){ $('#fc-agent-output').textContent='Agent error: '+err.message; }
+  };
+}
+
+/*** ===== Boot ===== ***/
+window.addEventListener('DOMContentLoaded', async ()=>{
+  canvas=$('#gcanvas'); ctx=canvas.getContext('2d');
+  initTheme(); $('#btn-theme').onclick=toggleTheme;
+  window.addEventListener('hashchange',()=>show()); show();
+  renderLeft(); renderProjectsBar(); renderLibrary();
+  resizeCanvas(); setupZoomPan(); bindGraphControls(); initPhysics(); renderCluster();
+  APP_READY=true;
+  await dbOpen(); await seedForecastingIfEmpty(); routeForecast();
+  // Demo seed if empty
+  if(st.notes.length===0){
+    const A={id:uid(),title:'Bank Funding Stress',content:'Deposits + MMFs. [[CRE Exposures]] [[Regional Banks]]',tags:['banking','risk','project:Atlas'],created_at:now(),updated_at:now(),debate:[]};
+    const B={id:uid(),title:'CRE Exposures',content:'Office vacancy high; maturities in 26-27. [[Policy Path]]',tags:['cre','risk','project:Borealis'],created_at:now(),updated_at:now(),debate:[]};
+    const C={id:uid(),title:'Policy Path',content:'Higher-for-longer; term premium.',tags:['policy','macro','project:Cascade'],created_at:now(),updated_at:now(),debate:[]};
+    const D={id:uid(),title:'Regional Banks',content:'Unrealized losses + deposit flight. [[Bank Funding Stress]]',tags:['banking','project:Drift'],created_at:now(),updated_at:now(),debate:[]};
+    st.notes.push(A,B,C,D); persist(); renderLeft(); renderProjectsBar(); renderLibrary(); initPhysics(); renderCluster();
+  }
+});
+</script>
+</body>
+</html>
