@@ -1,7 +1,7 @@
 // functions/api/openai.js
 
 const CORS = {
-  "Access-Control-Allow-Origin": "*",               // tighten to your domain if you want
+  "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type, Authorization"
 };
@@ -9,19 +9,15 @@ const CORS = {
 export default {
   async fetch(request, env) {
     const { method } = request;
-    const url = new URL(request.url);
 
-    // Health check & simple GET
     if (method === "GET") {
       return new Response("ok", { status: 200, headers: CORS });
     }
 
-    // CORS preflight
     if (method === "OPTIONS") {
       return new Response(null, { status: 204, headers: CORS });
     }
 
-    // POST → proxy to OpenAI
     if (method === "POST") {
       if (!env.OPENAI_API_KEY) {
         return json({ error: "OPENAI_API_KEY not set" }, 500);
@@ -33,6 +29,7 @@ export default {
       } catch {
         return json({ error: "Invalid JSON body" }, 400);
       }
+
       if (!payload?.model || !payload?.messages) {
         return json({ error: "Missing required fields: model, messages" }, 400);
       }
@@ -48,7 +45,6 @@ export default {
 
       const text = await upstream.text();
       const isJSON = upstream.headers.get("content-type")?.includes("application/json");
-
       return new Response(text, {
         status: upstream.status,
         headers: {
@@ -59,7 +55,6 @@ export default {
       });
     }
 
-    // Anything else
     return new Response("Method Not Allowed", { status: 405, headers: CORS });
   }
 };
