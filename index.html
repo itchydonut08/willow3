@@ -366,10 +366,10 @@ $('#nc-tags').oninput=chipTags;
 /*** ===== Agents via GitHub Pages Function ===== ***/
 const defaultPrompts = {
   "Historian": {"system":"You are a meticulous historian. Provide context and precedents.","user":"Note title: {title}\nNote text:\n{text}\nWrite 1-2 tight paragraphs with parallels and what to watch.","temperature":0.6,"model":"gpt-4o-mini"},
-  "Economist": {"system":"You are a pragmatic macroeconomist. Quantify where possible.","user":"Given the note "{title}":\n{text}\nReturn bullets for mechanisms, data to check, and a base/alt scenario.","temperature":0.5,"model":"gpt-4o-mini"},
-  "Contrarian": {"system":"You challenge assumptions with evidence; be constructive.","user":"Critique key assumptions in "{title}".\n{text}\nGive 3-5 counterpoints and 2 falsification tests.","temperature":0.7,"model":"gpt-4o-mini"},
-  "BlindSpot": {"system":"Identify omissions and risks.","user":"For "{title}", list blind spots, missing stakeholders, and unintended consequences.\n{text}\nReturn a short checklist.","temperature":0.5,"model":"gpt-4o-mini"},
-  "Interconnectedness": {"system":"Map 2nd/3rd-order links across domains.","user":"Note "{title}":\n{text}\nGive a compact map of 2nd/3rd-order effects and which prior notes to link to (just titles).","temperature":0.6,"model":"gpt-4o-mini"}
+  "Economist": {"system":"You are a pragmatic macroeconomist. Quantify where possible.","user":"Given the note {title}:\n{text}\nReturn bullets for mechanisms, data to check, and a base/alt scenario.","temperature":0.5,"model":"gpt-4o-mini"},
+  "Contrarian": {"system":"You challenge assumptions with evidence; be constructive.","user":"Critique key assumptions in {title}.\n{text}\nGive 3-5 counterpoints and 2 falsification tests.","temperature":0.7,"model":"gpt-4o-mini"},
+  "BlindSpot": {"system":"Identify omissions and risks.","user":"For {title}, list blind spots, missing stakeholders, and unintended consequences.\n{text}\nReturn a short checklist.","temperature":0.5,"model":"gpt-4o-mini"},
+  "Interconnectedness": {"system":"Map 2nd/3rd-order links across domains.","user":"Note {title}:\n{text}\nGive a compact map of 2nd/3rd-order effects and which prior notes to link to (just titles).","temperature":0.6,"model":"gpt-4o-mini"}
 };
 async function loadPrompts(){ try{ const res=await fetch('prompts.json',{cache:'no-store'}); st.prompts = res.ok? await res.json() : defaultPrompts; } catch{ st.prompts = defaultPrompts; } }
 loadPrompts();
