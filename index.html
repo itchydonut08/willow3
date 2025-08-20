@@ -783,5 +783,126 @@ window.addEventListener('DOMContentLoaded', async ()=>{
   }
 });
 </script>
+
+<!-- === Willow Daily Forecasts: read-only + safe DB + inject into #fc-q-list === -->
+<script>
+(function(){
+  // Add readonly class once DOM is ready
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => document.body.classList.add('readonly'));
+  } else {
+    document.body.classList.add('readonly');
+  }
+
+  // Inject minimal CSS
+  const css = `
+    body.readonly [data-action="new-forecast"],
+    body.readonly [data-action="resolve-forecast"],
+    body.readonly .forecast-create-form,
+    body.readonly .forecast-resolve-form,
+    body.readonly .forecast-toolbar .btn-new,
+    body.readonly .forecast-toolbar .btn-resolve,
+    body.readonly .btn-new-question,
+    body.readonly .btn-resolve-question { display:none !important; }
+    .is-disabled { opacity:.55; pointer-events:none; }
+    #daily-forecasts.card{
+      margin:8px 0; padding:10px; border-radius:10px;
+      border:1px solid var(--line, #e2e8f0); background:var(--bg, #fff);
+    }
+    #daily-forecasts h3{ margin:.25rem 0 .5rem 0; font-size:1rem; }
+    #daily-forecasts .row{ display:flex; gap:.5rem; align-items:center;
+      padding:.35rem 0; border-bottom:1px solid rgba(0,0,0,.06); }
+    #daily-forecasts .row:last-child{ border-bottom:none; }
+    #daily-forecasts .pill{ display:inline-block; padding:.15rem .45rem; border-radius:9999px;
+      background:var(--accent-soft, #eef2ff); color:var(--accent, #4f46e5); font-size:.8rem; }
+    #daily-forecasts .title{ flex:1; }  #daily-forecasts .meta{ white-space:nowrap; opacity:.8; }
+  `;
+  const style = document.createElement('style'); style.textContent = css; document.head.appendChild(style);
+
+  // Safe IndexedDB shims (no-ops in read-only)
+  let __db=null, __dbOpening=null;
+  async function ensureDB(){ if (document.body.classList.contains('readonly')) return false;
+    if (__db) return true; if (__dbOpening){ await __dbOpening; return !!__db; }
+    __dbOpening=new Promise((resolve)=>{ try{
+      const req=indexedDB.open('willow',1);
+      req.onupgradeneeded=e=>{ const db=e.target.result;
+        if(!db.objectStoreNames.contains('forecasts')) db.createObjectStore('forecasts',{keyPath:'id'});
+        if(!db.objectStoreNames.contains('events')) db.createObjectStore('events',{keyPath:'id'});
+      };
+      req.onsuccess=()=>{ __db=req.result; resolve(true); };
+      req.onerror =()=>{ console.warn('IndexedDB open failed:', req.error); resolve(false); };
+    }catch(err){ console.warn('IndexedDB not available:',err); resolve(false); }});
+    const ok=await __dbOpening; __dbOpening=null; return ok;
+  }
+  async function dbTx(storeName,mode,runFn){ const ok=await ensureDB();
+    if(!ok||!__db) return runFn(null,null,true);
+    const tx=__db.transaction(storeName,mode); const store=tx.objectStore(storeName);
+    return runFn(store,tx,false);
+  }
+  window.willowDbGetAll = async function willowDbGetAll(storeName){
+    return dbTx(storeName,'readonly',(s,t,noDB)=>{
+      if(noDB) return [];
+      return new Promise((res,rej)=>{ const r=s.getAll(); r.onsuccess=()=>res(r.result||[]); r.onerror=()=>rej(r.error); });
+    });
+  };
+
+  // Kill any mutation functions if present
+  const deny=name=>()=>{ console.warn(`${name} disabled`); alert('Read‑only mode: creating/resolving forecasts is disabled.'); return false; };
+  ['createForecast','saveForecast','resolveForecast','deleteForecast','editForecast','submitResolution','addForecastToTournament']
+    .forEach(fn=>{ try{ if (typeof window[fn]==='function') window[fn]=deny(fn);}catch{} });
+
+  // Inject the shared Daily Forecast Set into the Questions list (#fc-q-list)
+  (function injectDaily(){
+    const TARGETS = ['fc-q-list','questions-list','fc-list','q-list'];
+    const fmt=(iso)=>{ try{ return new Date(iso).toLocaleDateString(); }catch{return'';} };
+    const esc=(s)=> String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+    async function renderInto(target){
+      let card=document.getElementById('daily-forecasts');
+      if(!card){
+        card=document.createElement('section');
+        card.id='daily-forecasts'; card.className='card';
+        card.innerHTML='<h3>Today\'s Forecast Set</h3><div id="daily-list">Loading…</div>';
+        target.prepend(card);
+      }
+      try{
+        const r=await fetch('/api/daily'); // your Pages Function endpoint
+        if(!r.ok) throw new Error('HTTP '+r.status);
+        const d=await r.json(); const list=card.querySelector('#daily-list'); list.innerHTML='';
+        (d.items||[]).forEach(x=>{
+          const prob=(x.implied_prob!=null)? (x.implied_prob*100).toFixed(1)+'%':'—';
+          const row=document.createElement('div'); row.className='row';
+          row.innerHTML=`
+            <div class="pill">${esc(x.source||'')}</div>
+            <div class="title">${esc(x.title||'')}</div>
+            <div class="meta">p(yes) ${prob}${x.close_time? ' • closes '+fmt(x.close_time):''}</div>
+            <a href="${esc(x.url||'#')}" target="_blank" rel="noopener">open</a>
+          `;
+          list.appendChild(row);
+        });
+      }catch(e){
+        const list=card.querySelector('#daily-list');
+        list.textContent='Could not load today\'s set.'; console.error('daily load failed:',e);
+      }
+    }
+
+    function tryMountOnce(){
+      for (const id of TARGETS){
+        const el = document.getElementById(id);
+        if (el){ renderInto(el); return true; }
+      }
+      return false;
+    }
+
+    if (!tryMountOnce()){
+      const obs=new MutationObserver(()=>{ if(tryMountOnce()){ obs.disconnect(); } });
+      obs.observe(document.documentElement,{childList:true,subtree:true});
+      setTimeout(()=>obs.disconnect(),15000);
+    }
+  })();
+})();
+</script>
+<!-- === /Willow Daily Forecasts block === -->
+
 </body>
 </html>
