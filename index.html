@@ -1,6 +1,31 @@
 <!DOCTYPE html>
 <html lang="en" data-theme="light">
 <head>
+  
+<script>
+  window.WILLOW = { READ_ONLY: true };
+</script>
+<style>
+  /* Read‑only: hide creation / resolution controls via attribute or data-action hooks */
+  body.readonly [data-action="new-forecast"],
+  body.readonly [data-action="resolve-forecast"],
+  body.readonly .forecast-create-form,
+  body.readonly .forecast-resolve-form,
+  body.readonly .forecast-toolbar .btn-new,
+  body.readonly .forecast-toolbar .btn-resolve {
+    display: none !important;
+  }
+  /* Optional: make any disabled-looking card obviously inert */
+  .is-disabled { opacity: .55; pointer-events: none; }
+  .pill { display:inline-block; padding:.15rem .45rem; border-radius:9999px; background:#eee; font-size:.8rem; }
+  #daily-forecasts .row { display:flex; gap:.5rem; align-items:center; padding:.35rem 0; border-bottom:1px solid #f0f0f0; }
+  #daily-forecasts .title { flex:1; }
+  #daily-forecasts .meta { white-space:nowrap; font-size:.9rem; color:#666; }
+</style>
+
+
+
+  
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <title>Willow — Notes • Library • Physics Graph • Forecasting</title>
@@ -54,7 +79,7 @@ textarea{min-height:260px;resize:vertical}
 .gctrls{display:flex;gap:14px;align-items:center;margin-bottom:10px;flex-wrap:wrap}
 </style>
 </head>
-<body>
+<body class="readonly">
 <header>
   <div class="title">
     <h1>Willow</h1><span class="muted">Notes • Library • Physics Graph • Forecast</span>
