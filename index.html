@@ -1,1 +1,354 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Willow — Notes • Library • Physics Graph • Forecasting</title>
+<link rel="preconnect" href="https://d3js.org">
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<style>
+/* ============ THEME ============ */
+:root{
+  --ink:#111827; --muted:#6b7280; --bg:#f8fafc; --panel:#ffffff;
+  --line:#e5e7eb; --chip:#f3f4f6; --btn:#f9fafb; --link:#0ea5e9;
+  --g-edge:#cbd5e1; --g-node:#0ea5e9; --g-stroke:#0f172a;
+  --g-label:#0f172a; --g-focus:#fb7185; --g-bg:#ffffff;
+}
+[data-theme="dark"]{
+  --ink:#e5e7eb; --muted:#9ca3af; --bg:#0b1020; --panel:#0f172a;
+  --line:#1f2937; --chip:#111827; --btn:#111827; --link:#38bdf8;
+  --g-edge:#334155; --g-node:#22d3ee; --g-stroke:#e5e7eb;
+  --g-label:#e5e7eb; --g-focus:#fb7185; --g-bg:#0f172a;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,"Noto Sans",sans-serif}
+header{padding:12px 20px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;background:var(--panel);position:sticky;top:0;z-index:5}
+.title{display:flex;gap:10px;align-items:baseline}.title h1{margin:0;font-size:18px}
+.nav{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.nav a{padding:6px 10px;border:1px solid var(--line);border-radius:10px;background:var(--panel);text-decoration:none;color:inherit}
+.nav a.active{background:var(--ink);color:var(--panel)}
+.wrap{max-width:1200px;margin:0 auto;padding:16px}
+.grid-3{display:grid;grid-template-columns:260px 1fr 300px;gap:16px}
+.pane{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px}
+.tabs{display:flex;gap:8px}.tab{padding:6px 10px;border:1px solid var(--line);border-radius:10px;background:var(--panel);cursor:pointer;color:var(--ink)}.tab.active{background:var(--chip)}
+.list{border-top:1px solid var(--line);margin-top:10px;max-height:70vh;overflow:auto}
+.item{padding:10px;border-bottom:1px dashed var(--line);cursor:pointer}.item .t{font-weight:600}.muted{color:var(--muted)}
+.row{display:flex;gap:10px;align-items:center}.row.space{justify-content:space-between}
+.btn{background:var(--btn);border:1px solid var(--line);border-radius:10px;padding:8px 12px;cursor:pointer;color:var(--ink)}
+input[type="text"],textarea,select{width:100%;border:1px solid var(--line);border-radius:10px;padding:10px;background:var(--panel);color:var(--ink);font:inherit}
+textarea{min-height:260px;resize:vertical}
+.chips{display:flex;gap:6px;flex-wrap:wrap}.chip{background:var(--chip);border:1px solid var(--line);border-radius:999px;padding:4px 8px;font-size:12px;color:var(--ink)}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono",monospace;font-size:12px;color:var(--muted)}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px;cursor:pointer;display:flex;flex-direction:column}
+.card .title{font-weight:700;font-size:13px;margin-bottom:6px}.card .preview{color:var(--muted);font-size:12px;flex:1}.card .meta{display:flex;gap:8px;color:var(--muted);font-size:11px;margin-top:6px}
+#gwrap{position:relative}
+#gcanvas{width:100%;height:520px;border:1px solid var(--line);border-radius:12px;background:var(--panel);display:block;touch-action:none}
+.tooltip{position:absolute;pointer-events:none;background:var(--ink);color:var(--panel);padding:6px 8px;border-radius:8px;font-size:12px;opacity:0;transition:opacity .15s}
+.footer{text-align:center;color:var(--muted);font-size:12px;margin:12px 0 24px}
+.note-card{background:var(--panel);border:1px dashed var(--line);border-radius:12px;padding:10px}
+.projects-bar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.proj{display:flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:6px 10px;cursor:pointer}
+.proj .count{background:rgba(99,102,241,.15);border:1px solid rgba(99,102,241,.35);border-radius:999px;padding:2px 6px;font-size:11px}
+.badge{border:1px solid var(--line);padding:2px 6px;border-radius:999px;font-size:11px;background:var(--btn);color:var(--ink)}
+.gctrls{display:flex;gap:14px;align-items:center;margin-bottom:10px;flex-wrap:wrap}
+</style>
+</head>
+<body>
+<header>
+  <div class="title">
+    <h1>Willow</h1><span class="muted">Notes • Library • Physics Graph • Forecast</span>
+  </div>
+  <nav class="nav">
+    <a href="#/notecard" id="nav-notecard" class="">Notecard</a>
+    <a href="#/library" id="nav-library">Library</a>
+    <a href="#/graph" id="nav-graph" class="active">Graph</a>
+    <a href="#/forecast" id="nav-forecast">Forecast</a>
+    <span class="muted">•</span>
+    <button id="btn-export" class="btn">Export</button>
+    <label class="btn" style="cursor:pointer"><input id="file-import" type="file" accept="application/json" style="display:none"> Import</label>
+    <button id="btn-theme" class="btn" title="Toggle dark mode">Theme</button>
+  </nav>
+</header>
 
+<main class="wrap">
+  <!-- ===== Notecard ===== -->
+  <section id="view-notecard" class="grid-3" style="display: none;">
+    <aside class="pane">
+      <div class="tabs">
+        <button id="tab-notes" class="tab active">Notes</button>
+        <button id="tab-suggestions" class="tab">Suggestions</button>
+      </div>
+      <div id="left-list" class="list"></div>
+    </aside>
+    <section class="pane">
+      <input id="nc-title" type="text" placeholder="Title (new note)">
+      <textarea id="nc-content" placeholder="Text (new note). Use [[wikilinks]] to connect notes."></textarea>
+      <div class="row space" style="margin-top:6px">
+        <div class="row">
+          <button id="btn-save" class="btn">Save</button>
+          <button id="btn-new" class="btn">New</button>
+        </div>
+        <label class="btn"><input id="file-attach" type="file" style="display:none"> Attach file (metadata)</label>
+      </div>
+      <input id="nc-tags" type="text" placeholder="#Tags comma or #prefix">
+      <div id="tag-chips" class="chips" style="margin-top:6px"></div>
+      <div class="row" style="margin-top:10px">
+        <select id="debate-agent" style="width:auto">
+          <option value="Historian">Historian</option>
+          <option value="Economist">Economist</option>
+          <option value="Contrarian">Contrarian</option>
+          <option value="BlindSpot">Blind Spot</option>
+          <option value="Interconnectedness">Interconnectedness</option>
+        </select>
+        <button id="debate-ask" class="btn">Ask AI</button>
+        <button id="debate-add" class="btn">Add to note</button>
+      </div>
+      <pre id="debate-output" class="mono" style="white-space:pre-wrap"></pre>
+    </section>
+    <aside class="pane">
+      <div class="row space">
+        <div class="muted">Suggested Links</div>
+        <button class="btn" id="btn-run-suggest">Run</button>
+      </div>
+      <div id="suggested" class="list"></div>
+    </aside>
+  </section>
+
+  <!-- ===== Library ===== -->
+  <section id="view-library" style="display:none">
+    <div class="pane">
+      <h3 style="margin:0 0 8px">LIBRARY</h3>
+      <div id="projects-bar" class="projects-bar"></div>
+      <div class="lib-controls row" style="flex-wrap:wrap">
+        <input id="lib-search" type="text" placeholder="Search titles/content" style="flex:1;min-width:220px">
+        <input id="lib-tags" type="text" placeholder="#tag1, #tag2" style="min-width:200px">
+        <span class="muted">Min links</span><input id="lib-min" type="range" min="0" max="10" step="1" value="0"><span id="lib-min-val" class="badge">0</span>
+        <span class="muted">Card size</span><input id="lib-size" type="range" min="160" max="320" step="10" value="220">
+        <label class="row"><span class="muted">Newest first</span><input id="lib-sort" type="checkbox" checked="" style="margin-left:6px"></label>
+        <span id="lib-active-project" class="chip" style="display:none;cursor:pointer" title="Click to clear">Project: -</span>
+        <button id="lib-clear" class="btn">Clear</button>
+      </div>
+      <div id="lib-grid" class="lib-grid" style="display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));"></div>
+    </div>
+  </section>
+
+  <!-- ===== Graph ===== -->
+  <section id="view-graph" style="">
+    <div class="pane">
+      <h3 style="margin:0 0 8px">GRAPH (Physics)</h3>
+      <div class="gctrls">
+        <span class="muted">Breadth</span><input id="gr-breadth" type="range" min="0" max="10" step="1" value="0"><span id="gr-breadth-val" class="badge">0</span>
+        <span class="muted">Depth</span><input id="gr-depth" type="range" min="1" max="6" step="1" value="3"><span id="gr-depth-val" class="badge">3</span>
+        <span class="muted">G (attraction)</span><input id="gr-G" type="range" min="0" max="200" step="5" value="60"><span id="gr-G-val" class="badge">60</span>
+        <span class="muted">Collision +padding</span><input id="gr-pad" type="range" min="0" max="20" step="1" value="6"><span id="gr-pad-val" class="badge">6</span>
+        <span class="muted">Link base</span><input id="gr-link" type="range" min="40" max="220" step="5" value="110"><span id="gr-link-val" class="badge">110</span>
+        <span class="muted">Similarity weight</span><input id="gr-simw" type="range" min="0" max="2" step="0.1" value="1"><span id="gr-simw-val" class="badge">1.0</span>
+        <button id="gr-reset-focus" class="btn">Clear focus</button>
+        <button id="gr-pause" class="btn">Pause</button>
+        <button id="gr-reheat" class="btn">Reheat</button>
+        <button id="gr-resetview" class="btn">Reset View</button>
+      </div>
+      <div id="gwrap">
+        <canvas id="gcanvas" width="1146" height="520" style="cursor: grab;"></canvas>
+        <div id="gtooltip" class="tooltip" style="opacity: 0;">Node info</div>
+      </div>
+      <div class="muted" style="margin-top:8px">Zoom: wheel/pinch • Pan: drag background • Drag a node to move it • Click node to focus (center &amp; filter by Depth).</div>
+    </div>
+
+    <div class="pane" id="cluster-pane" style="margin-top:16px">
+      <div class="row space">
+        <h3 style="margin:0">GRAPH: Card Cluster</h3>
+        <div class="row"><span class="muted">Card size</span><input id="cl-size" type="range" min="160" max="320" step="10" value="220"><span class="muted">Depth</span><input id="cl-depth" type="range" min="1" max="5" step="1" value="1"></div>
+      </div>
+      <div class="grid-3" style="grid-template-columns:220px 1fr;gap:16px">
+        <aside><div class="muted">Focus Note</div><div id="cl-focus" class="note-card"><div class="muted">No focus selected.</div></div><div class="muted" style="margin:8px 0">Linked notes</div><div id="cl-links" class="mono" style="font-size:12px"></div></aside>
+        <section id="cl-canvas" style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-start"></section>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== Forecast ===== -->
+  <section id="view-forecast" style="display:none">
+    <div class="pane">
+      <div class="row space">
+        <h3 style="margin:0">FORECASTING</h3>
+        <div class="row" style="gap:8px">
+          <a class="btn" href="#/forecast">Main</a>
+          <a class="btn" href="#/forecast/questions">Questions</a>
+          <a class="btn" href="#/forecast/analysis">Analysis</a>
+        </div>
+      </div>
+    </div>
+
+    <div id="fc-main" class="pane" style="margin-top:12px;display:none">
+      <div class="row space">
+        <div class="row" style="gap:24px">
+          <div><div style="font-size:28px;font-weight:800" id="fc-brier">—</div><div class="muted">Brier Score</div></div>
+          <div><div style="font-size:28px;font-weight:800" id="fc-count">0</div><div class="muted">Forecasts</div></div>
+        </div>
+        <div class="row" style="gap:8px"><span class="muted">As of date</span><input id="fc-asof" type="date"></div>
+      </div>
+      <div class="row" style="gap:16px;align-items:flex-start;margin-top:12px">
+        <canvas id="fc-spark" width="520" height="120" style="border:1px solid var(--line);border-radius:10px;background:var(--panel)"></canvas>
+        <canvas id="fc-scatter" width="520" height="160" style="border:1px solid var(--line);border-radius:10px;background:var(--panel)"></canvas>
+      </div>
+      <div class="row" style="gap:16px;align-items:flex-start;margin-top:12px">
+        <div style="flex:1"><div class="muted">Best forecasts</div><ol id="fc-best" class="mono"></ol></div>
+        <div style="flex:1"><div class="muted">Worst forecasts</div><ol id="fc-worst" class="mono"></ol></div>
+      </div>
+    </div>
+
+    <div id="fc-qlist" class="pane" style="margin-top:12px;display:none">
+      <div class="row" style="gap:10px;align-items:flex-end">
+        <div style="flex:1"><label class="muted">Search</label><input id="fc-q-search" type="text" placeholder="Find a question"></div>
+        <div><label class="muted">Sort by</label><select id="fc-q-sort"><option value="date">Date</option><option value="new">New forecasts</option></select></div>
+        <button class="btn" id="fc-q-new">New Question</button>
+      </div>
+      <div id="fc-q-list" class="list" style="margin-top:8px"></div>
+    </div>
+
+    <div id="fc-qdetail" class="pane" style="margin-top:12px;display:none">
+      <div id="fc-q-head" class="row space"></div>
+      <div class="tabs" style="margin-top:8px">
+        <button class="tab active" data-fc-tab="forecast">Forecast</button>
+        <button class="tab" data-fc-tab="activity">Activity</button>
+        <button class="tab" data-fc-tab="crowd">Crowd forecast</button>
+        <button class="tab" data-fc-tab="notes">NOTES</button>
+      </div>
+      <div id="fc-tab-forecast" class="pane" style="border:none;padding:0;margin-top:8px">
+        <div id="fc-answers"></div>
+        <div class="row space" style="margin-top:8px">
+          <div class="muted mono" id="fc-sumcheck">Probabilities must sum to 100%.</div>
+          <div class="row" style="gap:8px">
+            <button class="btn" id="fc-save">Save</button>
+            <button class="btn" id="fc-submit">Submit</button>
+          </div>
+        </div>
+      </div>
+      <div id="fc-tab-activity" class="pane" style="display:none;border:none;padding:0;margin-top:8px"><div id="fc-activity" class="mono muted">No activity yet.</div></div>
+      <div id="fc-tab-crowd" class="pane" style="display:none;border:none;padding:0;margin-top:8px"><div class="row space"><div class="muted">Aggregate distribution</div></div><div id="fc-crowd-bars" style="margin-top:8px"></div></div>
+      <div id="fc-tab-notes" class="pane" style="display:none;border:none;padding:0;margin-top:8px">
+        <div class="row space"><div class="muted">Relevant NOTES</div><button class="btn" id="fc-notes-agent">Ask Note Forecast Agent</button></div>
+        <div class="row" style="gap:16px;align-items:flex-start;margin-top:8px">
+          <textarea id="fc-notes-list" class="mono" style="height:200px;flex:1" placeholder="Matched notes will appear here..."></textarea>
+          <div id="fc-notes-cluster" style="flex:1;min-height:200px;border:1px dashed var(--line);border-radius:10px;padding:8px"></div>
+        </div>
+        <pre id="fc-agent-output" class="mono" style="white-space:pre-wrap;margin-top:8px"></pre>
+      </div>
+    </div>
+
+    <div id="fc-analysis" class="pane" style="margin-top:12px;display:none">
+      <h3 style="margin:0 0 8px">FORECASTING: Analysis</h3>
+      <div class="row" style="gap:16px">
+        <textarea class="mono" style="height:260px;flex:1" placeholder="[Group/individual analysis of outcomes, patterns, etc.]"></textarea>
+        <textarea class="mono" style="height:260px;flex:1" placeholder="[Patterns relative to NOTES: linkages vs accuracy, misses &amp; blind spots, etc.]"></textarea>
+      </div>
+    </div>
+  </section>
+</main>
+
+<div class="footer">Local-first. All data is in your browser (localStorage + IndexedDB). © 2025</div>
+
+<script>
+/*** ===== Helpers / Globals ===== ***/
+const $ = s => document.querySelector(s);
+const $$ = s => Array.from(document.querySelectorAll(s));
+const esc = s => (''+s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[m]));
+const uid = () => (crypto.randomUUID ? crypto.randomUUID() : (Date.now()+Math.random()).toString(36));
+const now = () => new Date().toISOString();
+
+let canvas, ctx, transform = {k:1,x:0,y:0}, APP_READY=false;
+
+/*** ===== Theme ===== ***/
+const THEME_KEY='willow_theme';
+function applyTheme(t){ document.documentElement.setAttribute('data-theme', t); if(APP_READY && ctx) draw(); }
+function initTheme(){
+  const saved = localStorage.getItem(THEME_KEY);
+  const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  applyTheme(saved || (prefersDark ? 'dark':'light'));
+}
+function toggleTheme(){
+  const cur = document.documentElement.getAttribute('data-theme') || 'light';
+  const nxt = cur==='dark' ? 'light' : 'dark';
+  localStorage.setItem(THEME_KEY, nxt); applyTheme(nxt);
+}
+
+/*** ===== App State ===== ***/
+const st = { notes: JSON.parse(localStorage.getItem('wl_notes')||'[]'), focusId: localStorage.getItem('wl_focusId')||null, projFilter: localStorage.getItem('wl_proj')||null, prompts:{} };
+const persist = () => { localStorage.setItem('wl_notes', JSON.stringify(st.notes)); localStorage.setItem('wl_focusId', st.focusId||''); localStorage.setItem('wl_proj', st.projFilter||''); };
+
+/*** ===== Graph helpers ===== ***/
+function extractLinks(text){ const out=[]; if(!text) return out; const re=/\[\[([^\]]+)\]\]/g; let m; while((m=re.exec(text))!==null) out.push(m[1].trim()); return out; }
+function buildGraph(){
+  const titleToId={}; st.notes.forEach(n=>{ if(n.title) titleToId[n.title]=n.id; });
+  const edges=[]; st.notes.forEach(n=>{ extractLinks(n.content).forEach(t=>{ const to=titleToId[t]; if(to && to!==n.id) edges.push({source:n.id,target:to}); }); });
+  return {edges};
+}
+function degreeMap(edges){ const d={}; edges.forEach(e=>{ d[e.source]=(d[e.source]||0)+1; d[e.target]=(d[e.target]||0)+1; }); return d; }
+function neighborsMap(edges){ const map={}; edges.forEach(e=>{ (map[e.source]=map[e.source]||new Set()).add(e.target); (map[e.target]=map[e.target]||new Set()).add(e.source); }); return map; }
+
+/*** ===== Router ===== ***/
+function show(h){
+  h = h || location.hash || '#/notecard';
+  $('#nav-notecard').classList.toggle('active', h==='#/notecard');
+  $('#nav-library').classList.toggle('active', h==='#/library');
+  $('#nav-graph').classList.toggle('active', h==='#/graph');
+  $('#nav-forecast').classList.toggle('active', h.startsWith('#/forecast'));
+  $('#view-notecard').style.display = h==='#/notecard' ? '' : 'none';
+  $('#view-library').style.display = h==='#/library' ? '' : 'none';
+  $('#view-graph').style.display = h==='#/graph' ? '' : 'none';
+  $('#view-forecast').style.display = h.startsWith('#/forecast') ? '' : 'none';
+  if(h==='#/library'){ renderProjectsBar(); renderLibrary(); }
+  if(h==='#/graph'){ initPhysics(); renderCluster(); }
+  if(h.startsWith('#/forecast')){ routeForecast(); }
+}
+
+/*** ===== Notecard ===== ***/
+let leftMode='notes', currentId=null;
+function renderLeft(){
+  const host=$('#left-list'); host.innerHTML='';
+  if(leftMode==='notes'){
+    if(st.notes.length===0){ host.innerHTML='<div class="item muted">No notes saved.</div>'; return; }
+    st.notes.slice().sort((a,b)=>new Date(b.updated_at||b.created_at)-new Date(a.updated_at||a.created_at)).forEach(n=>{
+      const d=document.createElement('div'); d.className='item';
+      d.innerHTML = `<div class="t">${esc(n.title||'(untitled)')}</div><div class="muted">${esc((n.content||'').slice(0,120))}${(n.content||'').length>120?'…':''}</div>`;
+      d.onclick=()=>load(n.id); host.appendChild(d);
+    });
+  } else { renderSuggestions(); }
+}
+function chipTags(){ const t=tagsOf($('#nc-tags').value); $('#tag-chips').innerHTML=t.map(x=>`<span class="chip">#${esc(x)}</span>`).join(''); }
+function load(id){
+  const n=st.notes.find(x=>x.id===id); if(!n) return; currentId=id; st.focusId=id; persist();
+  $('#nc-title').value=n.title||''; $('#nc-content').value=n.content||''; $('#nc-tags').value=(n.tags||[]).join(', '); chipTags();
+}
+const tagsOf = s => (s||'').split(',').map(x=>x.trim().replace(/^#/, '')).filter(Boolean);
+const draft = ()=>({ id: currentId||uid(), title: $('#nc-title').value.trim(), content: $('#nc-content').value, tags: tagsOf($('#nc-tags').value) });
+
+function suggestFor(n){
+  const {edges}=buildGraph(); const deg=degreeMap(edges);
+  const kw = new Set((n.title||'').toLowerCase().split(/\W+/).filter(x=>x.length>3));
+  const out=[]; st.notes.forEach(m=>{
+    if(!m.title || m.id===n.id) return;
+    const tagI=(m.tags||[]).filter(t=>(n.tags||[]).includes(t));
+    const wordI=(m.title||'').toLowerCase().split(/\W+/).filter(x=>x.length>3 && kw.has(x));
+    const score = tagI.length*2 + wordI.length + (deg[m.id]||0)*0.1;
+    if(score>0) out.push({id:m.id,title:m.title,reason:`Tags: ${tagI.join(', ')||'-'} | Words: ${wordI.join(', ')||'-'} | Links: ${deg[m.id]||0}`});
+  });
+  out.sort((a,b)=>b.reason.length-a.reason.length); return out.slice(0,12);
+}
+function renderSuggestions(){
+  const host=$('#suggested'); host.innerHTML='';
+  const items=suggestFor(draft());
+  if(items.length===0){ host.innerHTML='<div class="item muted">No suggestions yet.</div>'; return; }
+  items.forEach(s=>{
+    const d=document.createElement('div'); d.className='item'; d.innerHTML=`<div class="t">${esc(s.title)}</div><div class="muted">${esc(s.reason)}</div>`;
+    d.onclick = ()=>{ const ta=$('#nc-content'); const txt=`[[${s.title}]]`; const p=ta.selectionStart||ta.value.length; ta.value=ta.value.slice(0,p)+txt+ta.value.slice(p); ta.selectionStart=ta.selectionEnd=p+txt.length; ta.focus(); };
+    host.appendChild(d);
+  });
+}
+$('#btn-run-suggest').onclick=renderSuggestions;
+$('#tab-notes').onclick=()=>{ leftMode='notes'; $('#tab-notes').classList.add('active'); $('#tab-suggestions').classList.remove('active'); renderLeft(); };
+$('#tab-suggestions').onclick=()=>{ leftMode='suggestions'; $('#tab-suggestions').classList.add('active'); $('#tab-notes').classList.remove('active'); renderLeft(); };
+$('#btn-new').onclick=()=>{ currentId=null; $('#nc-title').value=''; $('#nc-content').value=''; $('#nc-tags').value=''; chipTags(); };
+$('#btn-save').onclick
