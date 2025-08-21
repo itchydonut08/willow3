@@ -72,6 +72,17 @@ textarea{resize:vertical;min-height:120px}
   display: none !important;
 }
 
+/* Graph styling */
+#graphCanvas {
+  transition: cursor 0.2s;
+}
+#graphCanvas.dragging {
+  cursor: grabbing;
+}
+#graphCanvas.adding {
+  cursor: crosshair;
+}
+
 .linkbtn{background:none;border:none;padding:0;margin:0;cursor:pointer;color:inherit;text-align:left}
 svg text{font:12px ui-sans-serif,system-ui;fill:#334155}
 </style>
@@ -160,18 +171,20 @@ svg text{font:12px ui-sans-serif,system-ui;fill:#334155}
 <!-- Graph Tab -->
 <section id="graph" class="tab-content">
 <h2>Graph (Published Notes)</h2>
-<p class="muted">Visual representation of your knowledge network</p>
+<p class="muted">Drag nodes • scroll to zoom • right-click to add nodes • double-click to reset view</p>
 <div class="card" style="margin:12px 0;">
-<svg id="kg" viewBox="0 0 800 450" style="width:100%;height:420px;background:#f8fafc;">
-<circle cx="200" cy="200" r="20" fill="#6366f1"/>
-<circle cx="400" cy="150" r="20" fill="#6366f1"/>
-<circle cx="600" cy="250" r="20" fill="#6366f1"/>
-<line x1="200" y1="200" x2="400" y2="150" stroke="#cbd5e1"/>
-<line x1="400" y1="150" x2="600" y2="250" stroke="#cbd5e1"/>
-<text x="200" y="235" text-anchor="middle">Market Analysis</text>
-<text x="400" y="135" text-anchor="middle">Fed Policy</text>
-<text x="600" y="285" text-anchor="middle">Tech Trends</text>
-</svg>
+<div class="row" style="margin-bottom:10px;">
+<button id="addNode" class="btn">Add Note</button>
+<button id="addLink" class="btn">Add Link</button>
+<button id="resetGraph" class="btn">Reset View</button>
+<button id="pausePhysics" class="btn">Pause Physics</button>
+<span class="muted" style="margin-left:auto;">
+Nodes: <span id="nodeCount">0</span> • 
+Links: <span id="linkCount">0</span> •
+FPS: <span id="fps">60</span>
+</span>
+</div>
+<canvas id="graphCanvas" width="800" height="450" style="width:100%;height:420px;background:#f8fafc;border:1px solid var(--line);border-radius:8px;cursor:grab;display:block;"></canvas>
 </div>
 </section>
 
@@ -182,7 +195,7 @@ svg text{font:12px ui-sans-serif,system-ui;fill:#334155}
 <h3>Today's Forecast Set</h3>
 <div class="muted" style="margin-bottom:10px;">Live markets from Polymarket, Kalshi, and Prophet Arena. One vote per forecast.</div>
 <div id="daily-list">
-<!-- Demo forecast data hardcoded here -->
+<!-- Demo forecast data with PROPERLY FORMED HTML -->
 <div class="forecast-row">
 <div class="forecast-source">polymarket</div>
 <div class="forecast-title">Will the Federal Reserve cut interest rates by 0.5% or more at their next meeting?</div>
@@ -191,7 +204,7 @@ svg text{font:12px ui-sans-serif,system-ui;fill:#334155}
 <div class="vote-box" data-forecast-id="fed-rate-cut-dec">
 <label style="font-size:13px;color:#475569">Your p(yes):</label>
 <input type="range" min="1" max="99" value="50" class="vote-slider" />
-<output class="vote-output">50%</output>
+<output class="vote-output">50%</o>
 <button class="btn primary vote-btn">Vote</button>
 <span class="vote-msg muted"></span>
 </div>
@@ -205,7 +218,7 @@ svg text{font:12px ui-sans-serif,system-ui;fill:#334155}
 <div class="vote-box" data-forecast-id="cpi-inflation-nov">
 <label style="font-size:13px;color:#475569">Your p(yes):</label>
 <input type="range" min="1" max="99" value="50" class="vote-slider" />
-<output class="vote-output">50%</output>
+<output class="vote-output">50%</o>
 <button class="btn primary vote-btn">Vote</button>
 <span class="vote-msg muted"></span>
 </div>
@@ -219,7 +232,7 @@ svg text{font:12px ui-sans-serif,system-ui;fill:#334155}
 <div class="vote-box" data-forecast-id="bitcoin-100k">
 <label style="font-size:13px;color:#475569">Your p(yes):</label>
 <input type="range" min="1" max="99" value="50" class="vote-slider" />
-<output class="vote-output">50%</output>
+<output class="vote-output">50%</o>
 <button class="btn primary vote-btn">Vote</button>
 <span class="vote-msg muted"></span>
 </div>
@@ -233,7 +246,7 @@ svg text{font:12px ui-sans-serif,system-ui;fill:#334155}
 <div class="vote-box" data-forecast-id="unemployment-nov">
 <label style="font-size:13px;color:#475569">Your p(yes):</label>
 <input type="range" min="1" max="99" value="50" class="vote-slider" />
-<output class="vote-output">50%</output>
+<output class="vote-output">50%</o>
 <button class="btn primary vote-btn">Vote</button>
 <span class="vote-msg muted"></span>
 </div>
@@ -247,7 +260,7 @@ svg text{font:12px ui-sans-serif,system-ui;fill:#334155}
 <div class="vote-box" data-forecast-id="bank-failure-2024">
 <label style="font-size:13px;color:#475569">Your p(yes):</label>
 <input type="range" min="1" max="99" value="50" class="vote-slider" />
-<output class="vote-output">50%</output>
+<output class="vote-output">50%</o>
 <button class="btn primary vote-btn">Vote</button>
 <span class="vote-msg muted"></span>
 </div>
@@ -284,11 +297,11 @@ function showTab(tabName) {
 }
 
 // Vote tracking (localStorage for demo)
-const VOTE_STORAGE_KEY = 'willow_demo_votes';
+const VOTE_STORAGE = 'willow_demo_votes';
 
 function getVotes() {
   try {
-    return JSON.parse(localStorage.getItem(VOTE_STORAGE_KEY) || '{}');
+    return JSON.parse(localStorage.getItem(VOTE_STORAGE) || '{}');
   } catch {
     return {};
   }
@@ -297,7 +310,7 @@ function getVotes() {
 function saveVote(forecastId, probability) {
   const votes = getVotes();
   votes[forecastId] = probability;
-  localStorage.setItem(VOTE_STORAGE_KEY, JSON.stringify(votes));
+  localStorage.setItem(VOTE_STORAGE, JSON.stringify(votes));
 }
 
 function hasVoted(forecastId) {
@@ -359,55 +372,277 @@ function runSuggestions() {
   `;
 }
 
-// Initialize everything when page loads
-document.addEventListener('DOMContentLoaded', () => {
-  initVoteControls();
+// 2D Physics Graph Implementation with Canvas
+class Vector2 {
+  constructor(x = 0, y = 0) {
+    this.x = x;
+    this.y = y;
+  }
   
-  // Basic note form handling
-  document.getElementById('noteForm').addEventListener('submit', (e) => {
-    e.preventDefault();
-    const msg = document.getElementById('saveMsg');
-    msg.textContent = 'Note saved!';
-    msg.className = 'muted ok';
-    setTimeout(() => {
-      msg.textContent = '';
-      msg.className = 'muted';
-    }, 2000);
-  });
+  add(v) {
+    this.x += v.x;
+    this.y += v.y;
+    return this;
+  }
   
-  document.getElementById('saveDraft').addEventListener('click', () => {
-    const msg = document.getElementById('saveMsg');
-    msg.textContent = 'Draft saved!';
-    msg.className = 'muted ok';
-    setTimeout(() => {
-      msg.textContent = '';
-      msg.className = 'muted';
-    }, 2000);
-  });
+  subtract(v) {
+    this.x -= v.x;
+    this.y -= v.y;
+    return this;
+  }
   
-  document.getElementById('newNoteBtn').addEventListener('click', () => {
-    showTab('notecard');
-    document.querySelector('[name="title"]').focus();
-  });
-});
+  multiply(scalar) {
+    this.x *= scalar;
+    this.y *= scalar;
+    return this;
+  }
+  
+  magnitude() {
+    return Math.sqrt(this.x * this.x + this.y * this.y);
+  }
+  
+  normalize() {
+    const mag = this.magnitude();
+    if (mag > 0) {
+      this.x /= mag;
+      this.y /= mag;
+    }
+    return this;
+  }
+  
+  distance(v) {
+    const dx = this.x - v.x;
+    const dy = this.y - v.y;
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+  
+  clone() {
+    return new Vector2(this.x, this.y);
+  }
+}
 
-// Defensive measure: prevent any create/resolve forecast actions
-['createForecast', 'saveForecast', 'resolveForecast', 'deleteForecast', 'editForecast', 'submitResolution'].forEach(fn => {
-  window[fn] = () => {
-    console.warn(`${fn} is disabled (read-only mode)`);
-    alert('This site is read-only: creating or resolving forecasts is disabled.');
-    return false;
-  };
-});
+class Node {
+  constructor(id, label, x, y) {
+    this.id = id;
+    this.label = label;
+    this.position = new Vector2(x, y);
+    this.velocity = new Vector2(0, 0);
+    this.force = new Vector2(0, 0);
+    this.radius = 15;
+    this.mass = 1;
+    this.color = '#6366f1';
+    this.focused = false;
+    this.hovered = false;
+    this.pinned = false;
+  }
+  
+  update(deltaTime) {
+    if (this.pinned) return;
+    
+    // Apply forces using Verlet integration
+    const acceleration = this.force.clone().multiply(1 / this.mass);
+    this.velocity.add(acceleration.clone().multiply(deltaTime));
+    
+    // Apply damping
+    this.velocity.multiply(0.98);
+    
+    // Update position
+    this.position.add(this.velocity.clone().multiply(deltaTime));
+    
+    // Reset forces
+    this.force = new Vector2(0, 0);
+  }
+  
+  applyForce(force) {
+    this.force.add(force);
+  }
+  
+  draw(ctx, camera) {
+    const screenPos = camera.worldToScreen(this.position);
+    const screenRadius = this.radius * camera.zoom;
+    
+    // Draw node shadow
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.2)';
+    ctx.shadowBlur = 5;
+    ctx.shadowOffsetX = 2;
+    ctx.shadowOffsetY = 2;
+    
+    // Draw node
+    ctx.beginPath();
+    ctx.arc(screenPos.x, screenPos.y, screenRadius, 0, Math.PI * 2);
+    
+    if (this.focused) {
+      ctx.fillStyle = '#ef4444';
+      ctx.strokeStyle = '#dc2626';
+      ctx.lineWidth = 3 * camera.zoom;
+    } else if (this.hovered) {
+      ctx.fillStyle = '#4f46e5';
+      ctx.strokeStyle = '#4338ca';
+      ctx.lineWidth = 2 * camera.zoom;
+    } else {
+      ctx.fillStyle = this.color;
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 2 * camera.zoom;
+    }
+    
+    ctx.fill();
+    ctx.stroke();
+    
+    // Reset shadow
+    ctx.shadowColor = 'transparent';
+    ctx.shadowBlur = 0;
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 0;
+    
+    // Draw label
+    if (camera.zoom > 0.5) {
+      ctx.fillStyle = '#1e293b';
+      ctx.font = `${Math.max(10, 12 * camera.zoom)}px system-ui`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'top';
+      
+      const label = this.label.length > 15 ? this.label.substring(0, 15) + '...' : this.label;
+      ctx.fillText(label, screenPos.x, screenPos.y + screenRadius + 5);
+    }
+  }
+  
+  containsPoint(point, camera) {
+    const worldPoint = camera.screenToWorld(point);
+    return this.position.distance(worldPoint) <= this.radius;
+  }
+}
 
-// Remove any stray create/resolve buttons that might appear
-const observer = new MutationObserver(() => {
-  document.querySelectorAll('[data-action="new-forecast"], [data-action="resolve-forecast"], .btn-new-forecast, .btn-resolve').forEach(el => {
-    el.style.display = 'none';
-    el.disabled = true;
-  });
-});
-observer.observe(document.documentElement, { childList: true, subtree: true });
-</script>
-</body>
-</html>
+class Link {
+  constructor(source, target) {
+    this.source = source;
+    this.target = target;
+    this.restLength = 80;
+    this.strength = 0.1;
+    this.highlighted = false;
+  }
+  
+  update() {
+    const delta = this.target.position.clone().subtract(this.source.position);
+    const distance = delta.magnitude();
+    
+    if (distance === 0) return;
+    
+    const force = (distance - this.restLength) * this.strength;
+    const forceVector = delta.normalize().multiply(force);
+    
+    this.source.applyForce(forceVector.clone());
+    this.target.applyForce(forceVector.clone().multiply(-1));
+  }
+  
+  draw(ctx, camera) {
+    const sourceScreen = camera.worldToScreen(this.source.position);
+    const targetScreen = camera.worldToScreen(this.target.position);
+    
+    ctx.strokeStyle = this.highlighted ? '#4f46e5' : '#cbd5e1';
+    ctx.lineWidth = this.highlighted ? 3 : 2;
+    ctx.lineCap = 'round';
+    
+    ctx.beginPath();
+    ctx.moveTo(sourceScreen.x, sourceScreen.y);
+    ctx.lineTo(targetScreen.x, targetScreen.y);
+    ctx.stroke();
+    
+    // Draw arrow
+    if (camera.zoom > 0.7) {
+      const angle = Math.atan2(targetScreen.y - sourceScreen.y, targetScreen.x - sourceScreen.x);
+      const arrowLength = 10 * camera.zoom;
+      const arrowAngle = 0.5;
+      
+      ctx.beginPath();
+      ctx.moveTo(
+        targetScreen.x - Math.cos(angle) * this.target.radius * camera.zoom,
+        targetScreen.y - Math.sin(angle) * this.target.radius * camera.zoom
+      );
+      
+      const arrowTip = {
+        x: targetScreen.x - Math.cos(angle) * (this.target.radius + arrowLength) * camera.zoom,
+        y: targetScreen.y - Math.sin(angle) * (this.target.radius + arrowLength) * camera.zoom
+      };
+      
+      ctx.lineTo(
+        arrowTip.x + Math.cos(angle - arrowAngle) * arrowLength,
+        arrowTip.y + Math.sin(angle - arrowAngle) * arrowLength
+      );
+      
+      ctx.moveTo(arrowTip.x, arrowTip.y);
+      ctx.lineTo(
+        arrowTip.x + Math.cos(angle + arrowAngle) * arrowLength,
+        arrowTip.y + Math.sin(angle + arrowAngle) * arrowLength
+      );
+      
+      ctx.stroke();
+    }
+  }
+}
+
+class Camera {
+  constructor(canvas) {
+    this.position = new Vector2(0, 0);
+    this.zoom = 1;
+    this.canvas = canvas;
+    this.dpr = window.devicePixelRatio || 1;
+  }
+  
+  worldToScreen(worldPos) {
+    return new Vector2(
+      (worldPos.x - this.position.x) * this.zoom + this.canvas.width / (2 * this.dpr),
+      (worldPos.y - this.position.y) * this.zoom + this.canvas.height / (2 * this.dpr)
+    );
+  }
+  
+  screenToWorld(screenPos) {
+    return new Vector2(
+      (screenPos.x - this.canvas.width / (2 * this.dpr)) / this.zoom + this.position.x,
+      (screenPos.y - this.canvas.height / (2 * this.dpr)) / this.zoom + this.position.y
+    );
+  }
+}
+
+class PhysicsGraph {
+  constructor(canvas) {
+    this.canvas = canvas;
+    this.ctx = canvas.getContext('2d');
+    this.camera = new Camera(canvas);
+    this.nodes = [];
+    this.links = [];
+    this.running = true;
+    this.lastTime = 0;
+    this.fps = 60;
+    this.frameCount = 0;
+    this.lastFpsUpdate = 0;
+    
+    // Interaction state
+    this.draggedNode = null;
+    this.isDragging = false;
+    this.lastMouse = new Vector2(0, 0);
+    this.hoveredNode = null;
+    this.focusedNode = null;
+    
+    this.setupEvents();
+    this.createInitialNodes();
+    this.animate();
+  }
+  
+  createInitialNodes() {
+    const nodes = [
+      new Node('market-analysis', 'Market Analysis', -100, -50),
+      new Node('fed-policy', 'Fed Policy', 100, -100),
+      new Node('tech-trends', 'Tech Trends', 150, 50),
+      new Node('crypto-markets', 'Crypto Markets', -50, 100),
+      new Node('inflation-data', 'Inflation Data', 0, -150)
+    ];
+    
+    nodes.forEach(node => this.addNode(node));
+    
+    // Create links
+    this.addLink('market-analysis', 'fed-policy');
+    this.addLink('fed-policy', 'tech-trends');
+    this.addLink('market-analysis', 'crypto-markets');
+    this.addLink('fed-policy', 'inflation-data');
+    this.addLink('crypto-markets', 'tech-trends');
+  }
